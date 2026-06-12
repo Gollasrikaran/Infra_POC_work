@@ -191,17 +191,62 @@ def fill_earthwork_zones(img_gray):
         diag = np.sqrt(w**2 + h**2)
         aspect = w / h if h > 0 else 0
 
-        # Small, wide-ish blobs → dotted line segments
+        # Small, wide-ish blobs -> dotted line segments
         if 3 <= w <= 45 and 2 <= h <= 12 and aspect > 1.0:
             dotted_mask[labels == i] = 255
-        # Large components → solid design line
+        # Large components -> solid design line
+        # But skip compact text labels: short height (< 15px) with moderate width
+        # are likely text/numbers, not the design profile
         elif diag > 55 or w > 50 or h > 50:
+            if h < 15 and w < 120:
+                continue  # skip text labels like "652.71", station numbers, etc.
             solid_mask[labels == i] = 255
 
     # --- Heal small gaps in the boundary lines ---
     heal_k = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 1))
     solid_boundary = cv2.morphologyEx(solid_mask, cv2.MORPH_CLOSE, heal_k)
     dotted_boundary = cv2.morphologyEx(dotted_mask, cv2.MORPH_CLOSE, heal_k)
+
+    # --- Area-based dotted contour filtering ---
+    # Remove tiny noise contours while preserving all valid ground profile segments.
+    # Unlike keeping only the largest contour, this preserves broken/multi-segment profiles.
+    MIN_CONTOUR_AREA = 200
+    contours, _ = cv2.findContours(
+        dotted_boundary,
+        cv2.RETR_EXTERNAL,
+        cv2.CHAIN_APPROX_SIMPLE
+    )
+    filtered_dotted = np.zeros_like(dotted_boundary)
+    for cnt in contours:
+        if cv2.contourArea(cnt) >= MIN_CONTOUR_AREA:
+            cv2.drawContours(filtered_dotted, [cnt], -1, 255, thickness=cv2.FILLED)
+    # Keep original boundary pixels within the filtered regions
+    dotted_boundary = cv2.bitwise_and(dotted_boundary, filtered_dotted)
+
+    # --- Define corridor as overlap of BOTH profiles ---
+    # Colors should only appear where both solid and dotted lines are present.
+    solid_cols = np.where(np.any(solid_boundary > 0, axis=0))[0]
+    dotted_cols = np.where(np.any(dotted_boundary > 0, axis=0))[0]
+
+    if len(solid_cols) > 0 and len(dotted_cols) > 0:
+        margin = 30
+        # Corridor = overlap of both profile X-ranges + small margin
+        road_x_min = max(np.min(solid_cols), np.min(dotted_cols))
+        road_x_max = min(np.max(solid_cols), np.max(dotted_cols))
+        road_x_min = max(0, road_x_min - margin)
+        road_x_max = min(w_img - 1, road_x_max + margin)
+
+        # If overlap is too narrow, fall back to solid line extent
+        if road_x_max - road_x_min < 20:
+            road_x_min = max(0, np.min(solid_cols) - margin)
+            road_x_max = min(w_img - 1, np.max(solid_cols) + margin)
+    elif len(solid_cols) > 0:
+        margin = 30
+        road_x_min = max(0, np.min(solid_cols) - margin)
+        road_x_max = min(w_img - 1, np.max(solid_cols) + margin)
+    else:
+        road_x_min = 0
+        road_x_max = w_img - 1
 
     # --- Column-by-column: find the fill zone between the two lines ---
     red_fill = np.zeros_like(clean)
@@ -212,9 +257,10 @@ def fill_earthwork_zones(img_gray):
     bot_y = np.zeros(w_img, dtype=int)
     fill_type = np.zeros(w_img, dtype=int)  # 1 = red (cut), 2 = green (fill)
 
-    window = 25  # how far to look for nearby line pixels
+    window = 25  # how far to look for nearby SOLID line pixels
+    MAX_VERTICAL_DIFF = 60
 
-    for c in range(w_img):
+    for c in range(road_x_min, road_x_max):
         solid_rows = np.where(solid_boundary[:, c] == 255)[0]
 
         # If no solid line at this column, check nearby columns
@@ -229,37 +275,47 @@ def fill_earthwork_zones(img_gray):
         else:
             st, sb = np.min(solid_rows), np.max(solid_rows)
 
-        # Look for dotted line above or below the solid line
+        # Look for dotted line DIRECTLY at this column only (no neighbor search).
+        # This prevents picking up noise dots from adjacent columns.
         dots_above = np.where(dotted_boundary[:st, c] == 255)[0]
         dots_below = np.where(dotted_boundary[sb:, c] == 255)[0]
 
-        # If nothing at this column, check neighbors
-        if len(dots_above) == 0 and len(dots_below) == 0:
-            left = max(0, c - window)
-            right = min(w_img, c + window + 1)
-            nearby_above = np.where(dotted_boundary[:st, left:right] == 255)
-            nearby_below = np.where(dotted_boundary[sb:, left:right] == 255)
-            if len(nearby_above[0]) > 0:
-                dots_above = nearby_above[0]
-            if len(nearby_below[0]) > 0:
-                dots_below = nearby_below[0]
+        # Check BOTH above and below, pick the closer ground profile.
+        dist_above = float('inf')
+        dist_below = float('inf')
+        dot_y_above = None
+        dot_y_below = None
 
         if len(dots_above) > 0:
-            dot_y = np.max(dots_above)
-            if dot_y < st:
-                has_fill[c] = True
-                top_y[c] = dot_y
-                bot_y[c] = st
-                fill_type[c] = 1  # cut zone (dotted above solid)
-        elif len(dots_below) > 0:
-            dot_y = np.min(dots_below) + sb
-            if sb < dot_y:
-                has_fill[c] = True
-                top_y[c] = sb
-                bot_y[c] = dot_y
-                fill_type[c] = 2  # fill zone (dotted below solid)
+            dot_y_above = np.max(dots_above)
+            if dot_y_above < st:
+                gap = st - dot_y_above
+                if gap <= MAX_VERTICAL_DIFF:
+                    dist_above = gap
 
-    # --- Interpolate across small gaps ---
+        if len(dots_below) > 0:
+            dot_y_below = np.min(dots_below) + sb
+            if sb < dot_y_below:
+                gap = dot_y_below - sb
+                if gap <= MAX_VERTICAL_DIFF:
+                    dist_below = gap
+
+        # Pick the direction with the closer ground profile.
+        # Require a minimum gap of 5px to avoid coloring noise-level differences
+        # when the two profiles are nearly coincident.
+        MIN_GAP = 5
+        if dist_above <= dist_below and dist_above < float('inf') and dist_above >= MIN_GAP:
+            has_fill[c] = True
+            top_y[c] = dot_y_above
+            bot_y[c] = st
+            fill_type[c] = 1  # cut (ground above design)
+        elif dist_below < float('inf') and dist_below >= MIN_GAP:
+            has_fill[c] = True
+            top_y[c] = sb
+            bot_y[c] = dot_y_below
+            fill_type[c] = 2  # fill (ground below design)
+
+    # --- Interpolate across small gaps (same fill type only) ---
     valid = np.where(has_fill)[0]
 
     if len(valid) > 1:
@@ -278,10 +334,15 @@ def fill_earthwork_zones(img_gray):
                 if (ri - li) > max_gap:
                     continue
 
+                # Only interpolate if both neighbors have the SAME fill type.
+                # This prevents color bleeding across cut/fill transitions.
+                if fill_type[li] != fill_type[ri]:
+                    continue
+
                 w_frac = (c - li) / (ri - li)
                 ty = int(top_y[li] + w_frac * (top_y[ri] - top_y[li]))
                 by = int(bot_y[li] + w_frac * (bot_y[ri] - bot_y[li]))
-                ct = fill_type[li] if w_frac <= 0.5 else fill_type[ri]
+                ct = fill_type[li]
 
             if ty < by:
                 if ct == 1:
@@ -310,8 +371,30 @@ def fill_earthwork_zones(img_gray):
     red_clean = cv2.morphologyEx(red_fill, cv2.MORPH_CLOSE, smooth_h)
     red_clean = cv2.morphologyEx(red_clean, cv2.MORPH_CLOSE, smooth_v)
 
+    num_labels, labels_r, stats_r, _ = cv2.connectedComponentsWithStats(red_clean, 8)
+    filtered_red = np.zeros_like(red_clean)
+    for i in range(1, num_labels):
+        if stats_r[i, cv2.CC_STAT_AREA] > 300:
+            filtered_red[labels_r == i] = 255
+    red_clean = filtered_red
+
     green_clean = cv2.morphologyEx(green_fill, cv2.MORPH_CLOSE, smooth_h)
     green_clean = cv2.morphologyEx(green_clean, cv2.MORPH_CLOSE, smooth_v)
+
+    num_labels, labels_g, stats_g, _ = cv2.connectedComponentsWithStats(green_clean, 8)
+    filtered_green = np.zeros_like(green_clean)
+    for i in range(1, num_labels):
+        if stats_g[i, cv2.CC_STAT_AREA] > 300:
+            filtered_green[labels_g == i] = 255
+    green_clean = filtered_green
+
+    # --- Mask out text and design lines from fill regions ---
+    # Ensure colors never overlap with text, annotations, or the solid design line.
+    text_mask = (img_gray < 80).astype(np.uint8) * 255
+    protect_mask = cv2.bitwise_or(text_mask, solid_mask)
+    protect_dilated = cv2.dilate(protect_mask, np.ones((3, 3), np.uint8), iterations=1)
+    red_clean = cv2.subtract(red_clean, protect_dilated)
+    green_clean = cv2.subtract(green_clean, protect_dilated)
 
     # --- Apply colors ---
     output[red_clean == 255] = [0, 0, 255]     # red = cut

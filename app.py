@@ -185,7 +185,7 @@ st.markdown("""
 # STEP 1 — Upload
 # ===========================
 
-st.markdown("### 📄 Step 1 — Upload")
+st.markdown("### Step 1 — Upload")
 
 tab_pdf, tab_images = st.tabs(["📑 Upload PDF", "🖼️ Upload Images"])
 
@@ -279,10 +279,10 @@ st.divider()
 # STEP 2 — Select image
 # ===========================
 
-st.markdown("### 🎯 Step 2 — Select an Image to Process")
+st.markdown("### Step 2 — Select an Image to Process")
 
 if not st.session_state.images:
-    st.info("⬆️ Upload a PDF or images in Step 1.")
+    st.info("Upload a PDF or images in Step 1.")
 else:
     images = st.session_state.images
 
@@ -347,7 +347,7 @@ st.divider()
 # STEP 3 — Process
 # ===========================
 
-st.markdown("### 🎨 Step 3 — Road Zone Detection")
+st.markdown("### Step 3 — Road Zone Detection")
 
 st.markdown("""
 <div class="legend-container">
@@ -363,7 +363,7 @@ else:
     label = f"Station {sel['station']}" if sel["page"] else sel["name"]
 
     if st.session_state.processed_result is None:
-        if st.button(f"⚡ Process — {label}", key="btn_process", use_container_width=True):
+        if st.button(f"Process — {label}", key="btn_process", use_container_width=True):
             out_dir = os.path.join(get_work_dir(), "processed")
             os.makedirs(out_dir, exist_ok=True)
 
@@ -384,17 +384,17 @@ else:
                     st.rerun()
     else:
         res = st.session_state.processed_result
-        st.success(f"✅ Processed **{res['label']}**")
+        st.success(f"Processed **{res['label']}**")
 
         col_a, col_b = st.columns(2)
         with col_a:
-            st.markdown("##### 📷 Original")
+            st.markdown("##### Original")
             try:
                 st.image(Image.open(res["original"]), use_container_width=True)
             except Exception:
                 st.error("Could not load original.")
         with col_b:
-            st.markdown("##### 🎨 Processed (Cut / Fill)")
+            st.markdown("##### Processed (Cut / Fill)")
             try:
                 st.image(Image.open(res["processed"]), use_container_width=True)
             except Exception:
@@ -404,7 +404,7 @@ else:
         if os.path.exists(res["processed"]):
             with open(res["processed"], "rb") as f:
                 st.download_button(
-                    "📥 Download Processed Image", f.read(),
+                    "Download Processed Image", f.read(),
                     file_name=f"processed_{res['name']}", mime="image/png",
                     use_container_width=True,
                 )
