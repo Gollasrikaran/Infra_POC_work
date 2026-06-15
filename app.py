@@ -160,10 +160,10 @@ with st.sidebar:
         with st.expander("📐 Scale Report", expanded=False):
             df = pd.DataFrame(st.session_state.scale_report)
             df.columns = ["Page #", "H-Scale", "V-Scale"]
-            st.dataframe(df, use_container_width=True, hide_index=True)
+            st.dataframe(df, width='stretch', hide_index=True)
         st.divider()
 
-    if st.button("🔄 Reset Pipeline", use_container_width=True):
+    if st.button("🔄 Reset Pipeline", width='stretch'):
         if st.session_state.work_dir and os.path.exists(st.session_state.work_dir):
             shutil.rmtree(st.session_state.work_dir, ignore_errors=True)
         for k in list(st.session_state.keys()):
@@ -208,7 +208,7 @@ with tab_pdf:
 
         if st.session_state.upload_mode == "pdf" and st.session_state.images is None:
             st.success(f"✅ **{pdf_file.name}** ready.")
-            if st.button("🚀 Extract Cross-Sections", key="btn_extract", use_container_width=True):
+            if st.button("🚀 Extract Cross-Sections", key="btn_extract", width='stretch'):
                 out_dir = os.path.join(get_work_dir(), "extracted")
                 os.makedirs(out_dir, exist_ok=True)
 
@@ -320,7 +320,7 @@ else:
     col_l, col_m, col_r = st.columns([1, 2, 1])
     with col_m:
         try:
-            st.image(Image.open(images[idx]["path"]), caption=choice, use_container_width=True)
+            st.image(Image.open(images[idx]["path"]), caption=choice, width='stretch')
         except Exception as e:
             st.error(f"Could not load: {e}")
 
@@ -336,7 +336,7 @@ else:
             with cols[i % 4]:
                 try:
                     cap = f"Sta {img['station']}" if img["page"] else img["name"]
-                    st.image(Image.open(img["path"]), caption=cap, use_container_width=True)
+                    st.image(Image.open(img["path"]), caption=cap, width='stretch')
                 except Exception:
                     st.error("Load error")
 
@@ -362,17 +362,20 @@ else:
     sel = st.session_state.images[st.session_state.selected_idx]
     label = f"Station {sel['station']}" if sel["page"] else sel["name"]
 
+    debug_on = st.checkbox("🔍 Save debug images (intermediate pipeline stages)", value=False, key="debug_toggle")
+
     if st.session_state.processed_result is None:
-        if st.button(f"Process — {label}", key="btn_process", use_container_width=True):
+        if st.button(f"Process — {label}", key="btn_process", width='stretch'):
             out_dir = os.path.join(get_work_dir(), "processed")
             os.makedirs(out_dir, exist_ok=True)
+            dbg_dir = os.path.join(out_dir, "debug") if debug_on else None
 
             with st.spinner(f"Processing {label}..."):
                 gray = cv2.imread(sel["path"], cv2.IMREAD_GRAYSCALE)
                 if gray is None:
                     st.error("❌ Could not read the image.")
                 else:
-                    result = fill_earthwork_zones(gray)
+                    result = fill_earthwork_zones(gray, debug_dir=dbg_dir)
                     out_path = os.path.join(out_dir, f"processed_{sel['name']}")
                     cv2.imwrite(out_path, result)
                     st.session_state.processed_result = {
@@ -380,6 +383,7 @@ else:
                         "processed": out_path,
                         "name": sel["name"],
                         "label": label,
+                        "debug_dir": dbg_dir,
                     }
                     st.rerun()
     else:
@@ -390,13 +394,13 @@ else:
         with col_a:
             st.markdown("##### Original")
             try:
-                st.image(Image.open(res["original"]), use_container_width=True)
+                st.image(Image.open(res["original"]), width='stretch')
             except Exception:
                 st.error("Could not load original.")
         with col_b:
             st.markdown("##### Processed (Cut / Fill)")
             try:
-                st.image(Image.open(res["processed"]), use_container_width=True)
+                st.image(Image.open(res["processed"]), width='stretch')
             except Exception:
                 st.error("Could not load result.")
 
@@ -406,8 +410,27 @@ else:
                 st.download_button(
                     "Download Processed Image", f.read(),
                     file_name=f"processed_{res['name']}", mime="image/png",
-                    use_container_width=True,
+                    width='content',
                 )
+
+        # Show debug stage images if they were generated
+        dbg = res.get("debug_dir")
+        if dbg and os.path.isdir(dbg):
+            with st.expander("🔬 Debug: Intermediate Pipeline Stages", expanded=False):
+                debug_files = [
+                    ("1_binary.png", "Stage 1 — Binary threshold"),
+                    ("2_grid_detected.png", "Stage 2 — Grid lines detected"),
+                    ("3_after_grid_removal.png", "Stage 3 — After grid removal"),
+                    ("4_design_mask.png", "Stage 4 — Design (solid) mask"),
+                    ("5_dotted_mask.png", "Stage 5 — Ground (dotted) mask"),
+                    ("6_final.png", "Stage 6 — Final output"),
+                ]
+                for fname, caption in debug_files:
+                    fpath = os.path.join(dbg, fname)
+                    if os.path.exists(fpath):
+                        st.markdown(f"**{caption}**")
+                        st.image(Image.open(fpath), width='stretch')
+                        st.markdown("")
 
 
 # -- Footer --

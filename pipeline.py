@@ -130,7 +130,7 @@ def extract_cross_section_images(pdf_path, output_dir, zoom=4.0, progress_callba
     return extracted
 
 
-def fill_earthwork_zones(img_gray):
+def fill_earthwork_zones(img_gray, debug_dir=None):
     """
     Takes a grayscale cross-section image and identifies Cut vs Fill zones.
 
@@ -140,26 +140,83 @@ def fill_earthwork_zones(img_gray):
       3. Fills the area between them: red = cut, green = fill
       4. Restores the original text and design lines on top
 
+    Args:
+        img_gray: Grayscale input image.
+        debug_dir: If provided, saves intermediate images to this directory
+                   for diagnosing pipeline issues.
+
     Returns a BGR color image with the overlays applied.
     """
+    if debug_dir is not None:
+        os.makedirs(debug_dir, exist_ok=True)
+
     h_img, w_img = img_gray.shape
 
     # --- Grid removal ---
     # Threshold to get all dark marks, then isolate grid lines using morphology
     _, bw = cv2.threshold(img_gray, 235, 255, cv2.THRESH_BINARY_INV)
 
+    if debug_dir is not None:
+        cv2.imwrite(os.path.join(debug_dir, "1_binary.png"), bw)
+
+    # --- FIX 2: Pre-detect design line backup ---
+    # Before grid removal, identify large components that do NOT span the full
+    # image width. These are almost certainly drawing content (design line,
+    # text, etc.), not grid lines. We back them up so they can be restored
+    # if grid removal accidentally erases them.
+    design_backup = np.zeros_like(bw)
+    n_pre, lbl_pre, stats_pre, _ = cv2.connectedComponentsWithStats(bw, 8, cv2.CV_32S)
+    for i in range(1, n_pre):
+        x, y, w, h, area = stats_pre[i]
+        # Full-width components are grid lines — skip them
+        if w > w_img * 0.9:
+            continue
+        # Substantial content (area > 80) is likely drawing, not noise
+        if area > 80:
+            design_backup[lbl_pre == i] = 255
+
+    # --- FIX 3: Width-gated grid detection ---
+    # Use morphological open to find candidates, then verify each candidate
+    # component actually spans ≥90% of the image width before calling it a
+    # grid line. This prevents horizontal road segments from being classified
+    # as grid.
     vert_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 150))
     horiz_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (150, 1))
-    grid = cv2.add(
-        cv2.morphologyEx(bw, cv2.MORPH_OPEN, vert_kernel),
-        cv2.morphologyEx(bw, cv2.MORPH_OPEN, horiz_kernel),
-    )
+
+    raw_vert_grid = cv2.morphologyEx(bw, cv2.MORPH_OPEN, vert_kernel)
+    raw_horiz_grid = cv2.morphologyEx(bw, cv2.MORPH_OPEN, horiz_kernel)
+
+    def _filter_grid_by_span(grid_candidate, img_dim, threshold=0.9, use_width=True):
+        """Keep only components whose width (or height) spans ≥ threshold of img_dim."""
+        n, labels, stats, _ = cv2.connectedComponentsWithStats(grid_candidate, 8)
+        filtered = np.zeros_like(grid_candidate)
+        stat_idx = cv2.CC_STAT_WIDTH if use_width else cv2.CC_STAT_HEIGHT
+        for i in range(1, n):
+            if stats[i, stat_idx] > img_dim * threshold:
+                filtered[labels == i] = 255
+        return filtered
+
+    # Horizontal grid: only keep components spanning ≥90% of image width
+    filtered_horiz_grid = _filter_grid_by_span(raw_horiz_grid, w_img, 0.9, use_width=True)
+    # Vertical grid: only keep components spanning ≥90% of image height
+    filtered_vert_grid = _filter_grid_by_span(raw_vert_grid, h_img, 0.9, use_width=False)
+
+    grid = cv2.add(filtered_vert_grid, filtered_horiz_grid)
+
+    if debug_dir is not None:
+        cv2.imwrite(os.path.join(debug_dir, "2_grid_detected.png"), grid)
 
     # Protect actual drawing content from being erased along with the grid
     drawing = cv2.subtract(bw, grid)
     shield = cv2.dilate(drawing, np.ones((3, 3), np.uint8), iterations=1)
     eraser = cv2.subtract(grid, shield)
     clean = cv2.subtract(bw, eraser)
+
+    # Restore any design-line pixels that were lost during grid removal
+    clean[design_backup > 0] = 255
+
+    if debug_dir is not None:
+        cv2.imwrite(os.path.join(debug_dir, "3_after_grid_removal.png"), clean)
 
     # Start building the color output
     output = cv2.cvtColor(img_gray, cv2.COLOR_GRAY2BGR)
@@ -185,7 +242,9 @@ def fill_earthwork_zones(img_gray):
             continue
         if y > cutoff_y:
             continue
-        if h >= 16 and w <= 45:  # skip text-like vertical strokes
+        # FIX 5: Relaxed text filter — was (h>=16, w<=45), now (h>=20, w<=35)
+        # to avoid discarding steep design-line fragments
+        if h >= 20 and w <= 35:  # skip text-like vertical strokes
             continue
 
         diag = np.sqrt(w**2 + h**2)
@@ -194,11 +253,13 @@ def fill_earthwork_zones(img_gray):
         # Small, wide-ish blobs -> dotted line segments
         if 3 <= w <= 45 and 2 <= h <= 12 and aspect > 1.0:
             dotted_mask[labels == i] = 255
-        # Large components -> solid design line
-        # But skip compact text labels: short height (< 15px) with moderate width
-        # are likely text/numbers, not the design profile
-        elif diag > 55 or w > 50 or h > 50:
-            if h < 15 and w < 120:
+        # FIX 5: Relaxed size gate — was (diag>55, w>50, h>50), now lowered
+        # to capture more design-line fragments that may have been broken
+        # during grid removal
+        elif diag > 40 or w > 40 or h > 40:
+            # FIX 5: Tightened text-label skip — was (h<15, w<120), now
+            # (h<12, w<80) because real text labels are smaller
+            if h < 12 and w < 80:
                 continue  # skip text labels like "652.71", station numbers, etc.
             solid_mask[labels == i] = 255
 
@@ -400,9 +461,20 @@ def fill_earthwork_zones(img_gray):
     output[red_clean == 255] = [0, 0, 255]     # red = cut
     output[green_clean == 255] = [0, 210, 0]   # green = fill
 
-    # Restore the design lines (blue) and original text (black) on top
-    output[solid_mask == 255] = [255, 0, 0]
+    # --- FIX 6: Final design line restoration ---
+    # Combine the detected solid mask with the pre-grid-removal backup to
+    # ensure the Design Profile is ALWAYS visible, even if grid removal or
+    # component classification missed some fragments.
+    combined_design = cv2.bitwise_or(solid_mask, design_backup)
+    output[combined_design > 0] = [255, 0, 0]  # blue in BGR = design profile
+
+    # Restore original text (black) on top of everything
     text = (img_gray < 80) & (eraser == 0)
     output[text] = [0, 0, 0]
+
+    if debug_dir is not None:
+        cv2.imwrite(os.path.join(debug_dir, "4_design_mask.png"), solid_mask)
+        cv2.imwrite(os.path.join(debug_dir, "5_dotted_mask.png"), dotted_boundary)
+        cv2.imwrite(os.path.join(debug_dir, "6_final.png"), output)
 
     return output
