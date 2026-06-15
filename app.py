@@ -325,7 +325,7 @@ else:
             bar = st.progress(0, text="Processing images...")
 
             for idx, img_info in enumerate(images):
-                img_label = f"Station {img_info['station']}" if img_info["page"] else img_info["name"]
+                img_label = f"Page {img_info['page']} — Station {img_info['station']}" if img_info["page"] else img_info["name"]
                 bar.progress((idx) / len(images), text=f"Processing {img_label} ({idx + 1}/{len(images)})...")
 
                 gray = cv2.imread(img_info["path"], cv2.IMREAD_GRAYSCALE)

@@ -132,13 +132,16 @@ def extract_cross_section_images(pdf_path, output_dir, zoom=4.0, progress_callba
 
 def fill_earthwork_zones(img_gray, debug_dir=None):
     """
-    Takes a grayscale cross-section image and identifies Cut vs Fill zones.
+    Takes a grayscale cross-section image and identifies Cut vs Fill zones
+    using precision grid-removal and column-scan fill logic.
 
     How it works:
       1. Removes background grid lines (those light engineering grids)
       2. Separates the solid design line from the dotted ground line
-      3. Fills the area between them: red = cut, green = fill
-      4. Restores the original text and design lines on top
+      3. Scans each column to determine if dotted is above or below solid
+      4. Fills the area between them: red = cut (dotted above), green = fill (dotted below)
+      5. Applies morphological smoothing for clean continuous regions
+      6. Restores the original text and design lines on top
 
     Args:
         img_gray: Grayscale input image.
@@ -152,329 +155,133 @@ def fill_earthwork_zones(img_gray, debug_dir=None):
 
     h_img, w_img = img_gray.shape
 
-    # --- Grid removal ---
-    # Threshold to get all dark marks, then isolate grid lines using morphology
+    # --- STEP 1: GRID REMOVAL ---
     _, bw = cv2.threshold(img_gray, 235, 255, cv2.THRESH_BINARY_INV)
 
     if debug_dir is not None:
         cv2.imwrite(os.path.join(debug_dir, "1_binary.png"), bw)
 
-    # --- FIX 2: Pre-detect design line backup ---
-    # Before grid removal, identify large components that do NOT span the full
-    # image width. These are almost certainly drawing content (design line,
-    # text, etc.), not grid lines. We back them up so they can be restored
-    # if grid removal accidentally erases them.
-    design_backup = np.zeros_like(bw)
-    n_pre, lbl_pre, stats_pre, _ = cv2.connectedComponentsWithStats(bw, 8, cv2.CV_32S)
-    for i in range(1, n_pre):
-        x, y, w, h, area = stats_pre[i]
-        # Full-width components are grid lines — skip them
-        if w > w_img * 0.9:
-            continue
-        # Substantial content (area > 80) is likely drawing, not noise
-        if area > 80:
-            design_backup[lbl_pre == i] = 255
-
-    # --- FIX 3: Width-gated grid detection ---
-    # Use morphological open to find candidates, then verify each candidate
-    # component actually spans ≥90% of the image width before calling it a
-    # grid line. This prevents horizontal road segments from being classified
-    # as grid.
-    vert_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 150))
-    horiz_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (150, 1))
-
-    raw_vert_grid = cv2.morphologyEx(bw, cv2.MORPH_OPEN, vert_kernel)
-    raw_horiz_grid = cv2.morphologyEx(bw, cv2.MORPH_OPEN, horiz_kernel)
-
-    def _filter_grid_by_span(grid_candidate, img_dim, threshold=0.9, use_width=True):
-        """Keep only components whose width (or height) spans ≥ threshold of img_dim."""
-        n, labels, stats, _ = cv2.connectedComponentsWithStats(grid_candidate, 8)
-        filtered = np.zeros_like(grid_candidate)
-        stat_idx = cv2.CC_STAT_WIDTH if use_width else cv2.CC_STAT_HEIGHT
-        for i in range(1, n):
-            if stats[i, stat_idx] > img_dim * threshold:
-                filtered[labels == i] = 255
-        return filtered
-
-    # Horizontal grid: only keep components spanning ≥90% of image width
-    filtered_horiz_grid = _filter_grid_by_span(raw_horiz_grid, w_img, 0.9, use_width=True)
-    # Vertical grid: only keep components spanning ≥90% of image height
-    filtered_vert_grid = _filter_grid_by_span(raw_vert_grid, h_img, 0.9, use_width=False)
-
-    grid = cv2.add(filtered_vert_grid, filtered_horiz_grid)
+    ver_k = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 150))
+    hor_k = cv2.getStructuringElement(cv2.MORPH_RECT, (150, 1))
+    grid_mask = cv2.add(cv2.morphologyEx(bw, cv2.MORPH_OPEN, ver_k),
+                        cv2.morphologyEx(bw, cv2.MORPH_OPEN, hor_k))
 
     if debug_dir is not None:
-        cv2.imwrite(os.path.join(debug_dir, "2_grid_detected.png"), grid)
+        cv2.imwrite(os.path.join(debug_dir, "2_grid_detected.png"), grid_mask)
 
-    # Protect actual drawing content from being erased along with the grid
-    drawing = cv2.subtract(bw, grid)
-    shield = cv2.dilate(drawing, np.ones((3, 3), np.uint8), iterations=1)
-    eraser = cv2.subtract(grid, shield)
-    clean = cv2.subtract(bw, eraser)
-
-    # Restore any design-line pixels that were lost during grid removal
-    clean[design_backup > 0] = 255
+    diagram_only = cv2.subtract(bw, grid_mask)
+    bridge_shield = cv2.dilate(diagram_only, np.ones((3, 3), np.uint8), iterations=1)
+    eraser = cv2.subtract(grid_mask, bridge_shield)
+    clean_bw = cv2.subtract(bw, eraser)
 
     if debug_dir is not None:
-        cv2.imwrite(os.path.join(debug_dir, "3_after_grid_removal.png"), clean)
+        cv2.imwrite(os.path.join(debug_dir, "3_after_grid_removal.png"), clean_bw)
 
-    # Start building the color output
-    output = cv2.cvtColor(img_gray, cv2.COLOR_GRAY2BGR)
-    output[eraser > 0] = [255, 255, 255]  # white out the grid
+    # --- STEP 2: PREPARE OUTPUT & SEPARATE MASKS ---
+    color_output = cv2.cvtColor(img_gray, cv2.COLOR_GRAY2BGR)
+    color_output[eraser > 0] = [255, 255, 255]  # Clean background
 
-    # --- Classify line components ---
-    # Separate dotted ground line from solid design line based on shape/size
-    nlabels, labels, stats, _ = cv2.connectedComponentsWithStats(clean, 8, cv2.CV_32S)
+    nlabels, labels, stats, _ = cv2.connectedComponentsWithStats(clean_bw, 8, cv2.CV_32S)
 
-    border = 3
-    cutoff_y = int(h_img * 0.88)  # ignore anything below the scale bar
+    border_w = 3
+    border_h = 3
+    scale_line_y_threshold = int(h_img * 0.88)
 
-    solid_mask = np.zeros_like(clean)
-    dotted_mask = np.zeros_like(clean)
+    # Isolated clean masks extracted via connected component logic
+    solid_mask = np.zeros_like(clean_bw)
+    dotted_mask = np.zeros_like(clean_bw)
 
     for i in range(1, nlabels):
         x, y, w, h, area = stats[i]
 
-        # Skip border and scale bar components
-        if x < border or (x + w) > (w_img - border):
-            continue
-        if y < border or (y + h) > (h_img - border):
-            continue
-        if y > cutoff_y:
-            continue
-        # FIX 5: Relaxed text filter — was (h>=16, w<=45), now (h>=20, w<=35)
-        # to avoid discarding steep design-line fragments
-        if h >= 20 and w <= 35:  # skip text-like vertical strokes
+        # Border protection
+        if x < border_w or (x + w) > (w_img - border_w) or y < border_h or (y + h) > (h_img - border_h):
             continue
 
-        diag = np.sqrt(w**2 + h**2)
-        aspect = w / h if h > 0 else 0
+        # Ignore bottom scaling metrics
+        if y > scale_line_y_threshold:
+            continue
 
-        # Small, wide-ish blobs -> dotted line segments
-        if 3 <= w <= 45 and 2 <= h <= 12 and aspect > 1.0:
+        # Arrow Interceptor
+        if h >= 16 and w <= 45:
+            continue
+
+        diag_len = np.sqrt(w**2 + h**2)
+        aspect_ratio = w / h if h > 0 else 0
+
+        # 1. Dotted line identification (Extracted from Component Detection)
+        if 3 <= w <= 45 and 2 <= h <= 12 and aspect_ratio > 1.0:
             dotted_mask[labels == i] = 255
-        # FIX 5: Relaxed size gate — was (diag>55, w>50, h>50), now lowered
-        # to capture more design-line fragments that may have been broken
-        # during grid removal
-        elif diag > 40 or w > 40 or h > 40:
-            # FIX 5: Tightened text-label skip — was (h<15, w<120), now
-            # (h<12, w<80) because real text labels are smaller
-            if h < 12 and w < 80:
-                continue  # skip text labels like "652.71", station numbers, etc.
+
+        # 2. Strict solid line identification
+        elif diag_len > 55 or w > 50 or h > 50:
             solid_mask[labels == i] = 255
 
-    # --- Heal small gaps in the boundary lines ---
-    heal_k = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 1))
-    solid_boundary = cv2.morphologyEx(solid_mask, cv2.MORPH_CLOSE, heal_k)
-    dotted_boundary = cv2.morphologyEx(dotted_mask, cv2.MORPH_CLOSE, heal_k)
-
-    # --- Area-based dotted contour filtering ---
-    # Remove tiny noise contours while preserving all valid ground profile segments.
-    # Unlike keeping only the largest contour, this preserves broken/multi-segment profiles.
-    MIN_CONTOUR_AREA = 200
-    contours, _ = cv2.findContours(
-        dotted_boundary,
-        cv2.RETR_EXTERNAL,
-        cv2.CHAIN_APPROX_SIMPLE
-    )
-    filtered_dotted = np.zeros_like(dotted_boundary)
-    for cnt in contours:
-        if cv2.contourArea(cnt) >= MIN_CONTOUR_AREA:
-            cv2.drawContours(filtered_dotted, [cnt], -1, 255, thickness=cv2.FILLED)
-    # Keep original boundary pixels within the filtered regions
-    dotted_boundary = cv2.bitwise_and(dotted_boundary, filtered_dotted)
-
-    # --- Define corridor as overlap of BOTH profiles ---
-    # Colors should only appear where both solid and dotted lines are present.
-    solid_cols = np.where(np.any(solid_boundary > 0, axis=0))[0]
-    dotted_cols = np.where(np.any(dotted_boundary > 0, axis=0))[0]
-
-    if len(solid_cols) > 0 and len(dotted_cols) > 0:
-        margin = 30
-        # Corridor = overlap of both profile X-ranges + small margin
-        road_x_min = max(np.min(solid_cols), np.min(dotted_cols))
-        road_x_max = min(np.max(solid_cols), np.max(dotted_cols))
-        road_x_min = max(0, road_x_min - margin)
-        road_x_max = min(w_img - 1, road_x_max + margin)
-
-        # If overlap is too narrow, fall back to solid line extent
-        if road_x_max - road_x_min < 20:
-            road_x_min = max(0, np.min(solid_cols) - margin)
-            road_x_max = min(w_img - 1, np.max(solid_cols) + margin)
-    elif len(solid_cols) > 0:
-        margin = 30
-        road_x_min = max(0, np.min(solid_cols) - margin)
-        road_x_max = min(w_img - 1, np.max(solid_cols) + margin)
-    else:
-        road_x_min = 0
-        road_x_max = w_img - 1
-
-    # --- Column-by-column: find the fill zone between the two lines ---
-    red_fill = np.zeros_like(clean)
-    green_fill = np.zeros_like(clean)
-
-    has_fill = np.zeros(w_img, dtype=bool)
-    top_y = np.zeros(w_img, dtype=int)
-    bot_y = np.zeros(w_img, dtype=int)
-    fill_type = np.zeros(w_img, dtype=int)  # 1 = red (cut), 2 = green (fill)
-
-    window = 25  # how far to look for nearby SOLID line pixels
-    MAX_VERTICAL_DIFF = 60
-
-    for c in range(road_x_min, road_x_max):
-        solid_rows = np.where(solid_boundary[:, c] == 255)[0]
-
-        # If no solid line at this column, check nearby columns
-        if len(solid_rows) == 0:
-            left = max(0, c - window)
-            right = min(w_img, c + window + 1)
-            nearby = np.where(solid_boundary[:, left:right] == 255)
-            if len(nearby[0]) > 0:
-                st, sb = np.min(nearby[0]), np.max(nearby[0])
-            else:
-                continue
-        else:
-            st, sb = np.min(solid_rows), np.max(solid_rows)
-
-        # Look for dotted line DIRECTLY at this column only (no neighbor search).
-        # This prevents picking up noise dots from adjacent columns.
-        dots_above = np.where(dotted_boundary[:st, c] == 255)[0]
-        dots_below = np.where(dotted_boundary[sb:, c] == 255)[0]
-
-        # Check BOTH above and below, pick the closer ground profile.
-        dist_above = float('inf')
-        dist_below = float('inf')
-        dot_y_above = None
-        dot_y_below = None
-
-        if len(dots_above) > 0:
-            dot_y_above = np.max(dots_above)
-            if dot_y_above < st:
-                gap = st - dot_y_above
-                if gap <= MAX_VERTICAL_DIFF:
-                    dist_above = gap
-
-        if len(dots_below) > 0:
-            dot_y_below = np.min(dots_below) + sb
-            if sb < dot_y_below:
-                gap = dot_y_below - sb
-                if gap <= MAX_VERTICAL_DIFF:
-                    dist_below = gap
-
-        # Pick the direction with the closer ground profile.
-        # Require a minimum gap of 5px to avoid coloring noise-level differences
-        # when the two profiles are nearly coincident.
-        MIN_GAP = 5
-        if dist_above <= dist_below and dist_above < float('inf') and dist_above >= MIN_GAP:
-            has_fill[c] = True
-            top_y[c] = dot_y_above
-            bot_y[c] = st
-            fill_type[c] = 1  # cut (ground above design)
-        elif dist_below < float('inf') and dist_below >= MIN_GAP:
-            has_fill[c] = True
-            top_y[c] = sb
-            bot_y[c] = dot_y_below
-            fill_type[c] = 2  # fill (ground below design)
-
-    # --- Interpolate across small gaps (same fill type only) ---
-    valid = np.where(has_fill)[0]
-
-    if len(valid) > 1:
-        max_gap = 40
-
-        for c in range(np.min(valid), np.max(valid) + 1):
-            if has_fill[c]:
-                ty, by, ct = top_y[c], bot_y[c], fill_type[c]
-            else:
-                lefts = valid[valid < c]
-                rights = valid[valid > c]
-                if len(lefts) == 0 or len(rights) == 0:
-                    continue
-
-                li, ri = lefts[-1], rights[0]
-                if (ri - li) > max_gap:
-                    continue
-
-                # Only interpolate if both neighbors have the SAME fill type.
-                # This prevents color bleeding across cut/fill transitions.
-                if fill_type[li] != fill_type[ri]:
-                    continue
-
-                w_frac = (c - li) / (ri - li)
-                ty = int(top_y[li] + w_frac * (top_y[ri] - top_y[li]))
-                by = int(bot_y[li] + w_frac * (bot_y[ri] - bot_y[li]))
-                ct = fill_type[li]
-
-            if ty < by:
-                if ct == 1:
-                    red_fill[ty:by, c] = 255
-                elif ct == 2:
-                    green_fill[ty:by, c] = 255
-
-    # --- Horizontal gap filling ---
-    if len(valid) > 1:
-        x_min, x_max = np.min(valid), np.max(valid)
-        max_h_gap = 60
-
-        for r in range(cutoff_y):
-            for overlay in [green_fill, red_fill]:
-                cols = np.where(overlay[r, x_min:x_max + 1] == 255)[0] + x_min
-                if len(cols) > 1:
-                    for idx in range(len(cols) - 1):
-                        gap = cols[idx + 1] - cols[idx]
-                        if 1 < gap < max_h_gap:
-                            overlay[r, cols[idx]:cols[idx + 1]] = 255
-
-    # --- Smooth edges ---
-    smooth_h = cv2.getStructuringElement(cv2.MORPH_RECT, (20, 1))
-    smooth_v = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 3))
-
-    red_clean = cv2.morphologyEx(red_fill, cv2.MORPH_CLOSE, smooth_h)
-    red_clean = cv2.morphologyEx(red_clean, cv2.MORPH_CLOSE, smooth_v)
-
-    num_labels, labels_r, stats_r, _ = cv2.connectedComponentsWithStats(red_clean, 8)
-    filtered_red = np.zeros_like(red_clean)
-    for i in range(1, num_labels):
-        if stats_r[i, cv2.CC_STAT_AREA] > 300:
-            filtered_red[labels_r == i] = 255
-    red_clean = filtered_red
-
-    green_clean = cv2.morphologyEx(green_fill, cv2.MORPH_CLOSE, smooth_h)
-    green_clean = cv2.morphologyEx(green_clean, cv2.MORPH_CLOSE, smooth_v)
-
-    num_labels, labels_g, stats_g, _ = cv2.connectedComponentsWithStats(green_clean, 8)
-    filtered_green = np.zeros_like(green_clean)
-    for i in range(1, num_labels):
-        if stats_g[i, cv2.CC_STAT_AREA] > 300:
-            filtered_green[labels_g == i] = 255
-    green_clean = filtered_green
-
-    # --- Mask out text and design lines from fill regions ---
-    # Ensure colors never overlap with text, annotations, or the solid design line.
-    text_mask = (img_gray < 80).astype(np.uint8) * 255
-    protect_mask = cv2.bitwise_or(text_mask, solid_mask)
-    protect_dilated = cv2.dilate(protect_mask, np.ones((3, 3), np.uint8), iterations=1)
-    red_clean = cv2.subtract(red_clean, protect_dilated)
-    green_clean = cv2.subtract(green_clean, protect_dilated)
-
-    # --- Apply colors ---
-    output[red_clean == 255] = [0, 0, 255]     # red = cut
-    output[green_clean == 255] = [0, 210, 0]   # green = fill
-
-    # --- FIX 6: Final design line restoration ---
-    # Combine the detected solid mask with the pre-grid-removal backup to
-    # ensure the Design Profile is ALWAYS visible, even if grid removal or
-    # component classification missed some fragments.
-    combined_design = cv2.bitwise_or(solid_mask, design_backup)
-    output[combined_design > 0] = [255, 0, 0]  # blue in BGR = design profile
-
-    # Restore original text (black) on top of everything
-    text = (img_gray < 80) & (eraser == 0)
-    output[text] = [0, 0, 0]
+    # --- STEP 3: TEXT GAP HEALING & FILL LOGIC ---
+    # We apply horizontal healing elements to close mask splits created by numbers/text tags
+    heal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 1))
+    solid_boundary = cv2.morphologyEx(solid_mask, cv2.MORPH_CLOSE, heal_kernel)
+    dotted_boundary = cv2.morphologyEx(dotted_mask, cv2.MORPH_CLOSE, heal_kernel)
 
     if debug_dir is not None:
         cv2.imwrite(os.path.join(debug_dir, "4_design_mask.png"), solid_mask)
         cv2.imwrite(os.path.join(debug_dir, "5_dotted_mask.png"), dotted_boundary)
-        cv2.imwrite(os.path.join(debug_dir, "6_final.png"), output)
 
-    return output
+    red_overlay = np.zeros_like(clean_bw)
+    green_overlay = np.zeros_like(clean_bw)
+
+    # Scan EVERY column across the entire image canvas width using the healed boundaries
+    for c in range(w_img):
+        solid_rows = np.where(solid_boundary[:, c] == 255)[0]
+        if len(solid_rows) == 0:
+            continue
+
+        st = np.min(solid_rows)
+        sb = np.max(solid_rows)
+
+        # Look above and below the solid line bounds in this specific column
+        dotted_above = np.where(dotted_boundary[:st, c] == 255)[0]
+        dotted_below = np.where(dotted_boundary[sb:, c] == 255)[0]
+
+        # STRICT COLORING CONDITION RULE
+        if len(dotted_above) > 0:
+            # Dotted line is ABOVE -> Color the empty space completely RED (cut)
+            boundary_y = np.max(dotted_above)
+            red_overlay[boundary_y:st, c] = 255
+        elif len(dotted_below) > 0:
+            # Solid line is ABOVE (Dotted is below) -> Color the space completely GREEN (fill)
+            boundary_y = np.min(dotted_below) + sb
+            green_overlay[sb:boundary_y, c] = 255
+
+    # --- STEP 4: GLOBAL CORNER SMOOTHING ENGINE ---
+    gap_threshold = 60
+    hor_close_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (gap_threshold, 1))
+
+    red_overlay_clean = cv2.morphologyEx(red_overlay, cv2.MORPH_CLOSE, hor_close_kernel)
+    green_overlay_clean = cv2.morphologyEx(green_overlay, cv2.MORPH_CLOSE, hor_close_kernel)
+
+    # Secondary closures to lock overlay bounds to the exact outer corners
+    corner_kernel_v = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 5))
+    smooth_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))  # Round edges prevent jagged stair-stepping
+
+    # Execute precise structural edge expansions
+    green_overlay_clean = cv2.morphologyEx(green_overlay_clean, cv2.MORPH_CLOSE, corner_kernel_v)
+    green_overlay_clean = cv2.dilate(green_overlay_clean, smooth_kernel, iterations=1)
+
+    red_overlay_clean = cv2.morphologyEx(red_overlay_clean, cv2.MORPH_CLOSE, corner_kernel_v)
+    red_overlay_clean = cv2.dilate(red_overlay_clean, smooth_kernel, iterations=1)
+
+    # Stamp the polished continuous color fills onto our final canvas image
+    color_output[red_overlay_clean == 255] = [0, 0, 255]     # Pure Red (Dotted line above = cut)
+    color_output[green_overlay_clean == 255] = [0, 210, 0]   # Pure Green (Solid line above = fill)
+
+    # --- STEP 5: RESTORE ORIGINAL DESIGN LINES (BLUE) & EMBEDDED TEXT ---
+    color_output[solid_mask == 255] = [255, 0, 0]             # Pure Blue (design profile overlaid cleanly)
+
+    text_mask = (img_gray < 80) & (eraser == 0)
+    color_output[text_mask] = [0, 0, 0]
+
+    if debug_dir is not None:
+        cv2.imwrite(os.path.join(debug_dir, "6_final.png"), color_output)
+
+    return color_output
