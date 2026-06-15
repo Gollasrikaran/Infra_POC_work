@@ -116,8 +116,7 @@ for key, default in {
     "pdf_name": None,
     "scale_report": None,
     "images": None,
-    "selected_idx": None,
-    "processed_result": None,
+    "processed_results": None,
     "work_dir": None,
 }.items():
     if key not in st.session_state:
@@ -136,12 +135,10 @@ with st.sidebar:
     st.markdown("## 🛣️ Pipeline Steps")
 
     steps = [
-        ("1", "Upload", "Upload a PDF or images",
+        ("1", "Upload & Extract", "Upload a PDF or images",
          st.session_state.images is not None),
-        ("2", "Select Image", "Choose a cross-section to process",
-         st.session_state.selected_idx is not None),
-        ("3", "Process Zones", "Detect Cut/Fill for selected image",
-         st.session_state.processed_result is not None),
+        ("2", "Process All", "Detect Cut/Fill for all images",
+         st.session_state.processed_results is not None),
     ]
     for num, title, desc, done in steps:
         cls = "step-card step-done" if done else "step-card"
@@ -203,7 +200,7 @@ with tab_pdf:
                 f.write(pdf_file.getbuffer())
             st.session_state.update(
                 pdf_path=path, pdf_name=pdf_file.name, upload_mode="pdf",
-                images=None, selected_idx=None, processed_result=None, scale_report=None,
+                images=None, processed_results=None, scale_report=None,
             )
 
         if st.session_state.upload_mode == "pdf" and st.session_state.images is None:
@@ -227,7 +224,7 @@ with tab_pdf:
                      "page": r["page"], "station": r["station"]}
                     for r in raw
                 ]
-                st.session_state.update(selected_idx=None, processed_result=None)
+                st.session_state.processed_results = None
                 st.rerun()
 
         elif st.session_state.upload_mode == "pdf" and st.session_state.images is not None:
@@ -265,7 +262,7 @@ with tab_images:
             st.session_state.update(
                 upload_mode="images", images=items,
                 pdf_path=None, pdf_name=None, scale_report=None,
-                selected_idx=None, processed_result=None,
+                processed_results=None,
             )
             st.rerun()
 
@@ -276,10 +273,17 @@ st.divider()
 
 
 # ===========================
-# STEP 2 — Select image
+# STEP 2 — Process All Images
 # ===========================
 
-st.markdown("### Step 2 — Select an Image to Process")
+st.markdown("### Step 2 — Process All Images")
+
+st.markdown("""
+<div class="legend-container">
+    <div class="legend-item"><span class="legend-dot red"></span>Cut Zone (Excavation)</div>
+    <div class="legend-item"><span class="legend-dot green"></span>Fill Zone (Embankment)</div>
+    <div class="legend-item"><span class="legend-dot blue"></span>Design Profile Line</div>
+</div>""", unsafe_allow_html=True)
 
 if not st.session_state.images:
     st.info("Upload a PDF or images in Step 1.")
@@ -299,138 +303,120 @@ else:
 
     st.markdown("")
 
-    # Dropdown
-    labels = []
-    for img in images:
-        if img["page"]:
-            labels.append(f"Page {img['page']} — Station {img['station']}")
-        else:
-            labels.append(img["name"])
-
-    choice = st.selectbox(
-        "Choose a cross-section image:",
-        options=labels,
-        index=st.session_state.selected_idx or 0,
-        key="image_selector",
-    )
-    idx = labels.index(choice)
-
-    # Preview
-    st.markdown("")
-    col_l, col_m, col_r = st.columns([1, 2, 1])
-    with col_m:
-        try:
-            st.image(Image.open(images[idx]["path"]), caption=choice, width='stretch')
-        except Exception as e:
-            st.error(f"Could not load: {e}")
-
-    # Track changes
-    if st.session_state.selected_idx != idx:
-        st.session_state.selected_idx = idx
-        st.session_state.processed_result = None
-
-    # Full gallery
-    with st.expander("📋 View All Images", expanded=False):
+    # Preview gallery of extracted images
+    with st.expander("📋 Preview Extracted Images", expanded=False):
         cols = st.columns(min(len(images), 4))
         for i, img in enumerate(images):
             with cols[i % 4]:
                 try:
                     cap = f"Sta {img['station']}" if img["page"] else img["name"]
-                    st.image(Image.open(img["path"]), caption=cap, width='stretch')
+                    st.image(Image.open(img["path"]), caption=cap, use_container_width=True)
                 except Exception:
                     st.error("Load error")
 
-st.divider()
-
-
-# ===========================
-# STEP 3 — Process
-# ===========================
-
-st.markdown("### Step 3 — Road Zone Detection")
-
-st.markdown("""
-<div class="legend-container">
-    <div class="legend-item"><span class="legend-dot red"></span>Cut Zone (Excavation)</div>
-    <div class="legend-item"><span class="legend-dot green"></span>Fill Zone (Embankment)</div>
-    <div class="legend-item"><span class="legend-dot blue"></span>Design Profile Line</div>
-</div>""", unsafe_allow_html=True)
-
-if st.session_state.selected_idx is None:
-    st.info("⬆️ Select an image in Step 2.")
-else:
-    sel = st.session_state.images[st.session_state.selected_idx]
-    label = f"Station {sel['station']}" if sel["page"] else sel["name"]
-
     debug_on = st.checkbox("🔍 Save debug images (intermediate pipeline stages)", value=False, key="debug_toggle")
 
-    if st.session_state.processed_result is None:
-        if st.button(f"Process — {label}", key="btn_process", width='stretch'):
+    if st.session_state.processed_results is None:
+        if st.button(f"🚀 Process All {len(images)} Images", key="btn_process_all", use_container_width=True):
             out_dir = os.path.join(get_work_dir(), "processed")
             os.makedirs(out_dir, exist_ok=True)
-            dbg_dir = os.path.join(out_dir, "debug") if debug_on else None
 
-            with st.spinner(f"Processing {label}..."):
-                gray = cv2.imread(sel["path"], cv2.IMREAD_GRAYSCALE)
+            results = []
+            bar = st.progress(0, text="Processing images...")
+
+            for idx, img_info in enumerate(images):
+                img_label = f"Station {img_info['station']}" if img_info["page"] else img_info["name"]
+                bar.progress((idx) / len(images), text=f"Processing {img_label} ({idx + 1}/{len(images)})...")
+
+                gray = cv2.imread(img_info["path"], cv2.IMREAD_GRAYSCALE)
                 if gray is None:
-                    st.error("❌ Could not read the image.")
-                else:
-                    result = fill_earthwork_zones(gray, debug_dir=dbg_dir)
-                    out_path = os.path.join(out_dir, f"processed_{sel['name']}")
-                    cv2.imwrite(out_path, result)
-                    st.session_state.processed_result = {
-                        "original": sel["path"],
-                        "processed": out_path,
-                        "name": sel["name"],
-                        "label": label,
-                        "debug_dir": dbg_dir,
-                    }
-                    st.rerun()
+                    results.append({
+                        "original": img_info["path"],
+                        "processed": None,
+                        "name": img_info["name"],
+                        "label": img_label,
+                        "debug_dir": None,
+                        "error": True,
+                    })
+                    continue
+
+                # Debug dir per image (only if enabled)
+                dbg_dir = None
+                if debug_on:
+                    safe_name = os.path.splitext(img_info["name"])[0]
+                    dbg_dir = os.path.join(out_dir, "debug", safe_name)
+
+                result = fill_earthwork_zones(gray, debug_dir=dbg_dir)
+                out_path = os.path.join(out_dir, f"processed_{img_info['name']}")
+                cv2.imwrite(out_path, result)
+
+                results.append({
+                    "original": img_info["path"],
+                    "processed": out_path,
+                    "name": img_info["name"],
+                    "label": img_label,
+                    "debug_dir": dbg_dir,
+                    "error": False,
+                })
+
+            bar.progress(1.0, text="Done!")
+            st.session_state.processed_results = results
+            st.rerun()
     else:
-        res = st.session_state.processed_result
-        st.success(f"Processed **{res['label']}**")
+        results = st.session_state.processed_results
+        success_count = sum(1 for r in results if not r.get("error"))
+        st.success(f"✅ Processed **{success_count}/{len(results)}** images successfully.")
 
-        col_a, col_b = st.columns(2)
-        with col_a:
-            st.markdown("##### Original")
-            try:
-                st.image(Image.open(res["original"]), width='stretch')
-            except Exception:
-                st.error("Could not load original.")
-        with col_b:
-            st.markdown("##### Processed (Cut / Fill)")
-            try:
-                st.image(Image.open(res["processed"]), width='stretch')
-            except Exception:
-                st.error("Could not load result.")
+        # Show each result as an expandable section
+        for i, res in enumerate(results):
+            if res.get("error"):
+                st.error(f"❌ **{res['label']}** — Could not read image.")
+                continue
 
-        st.markdown("")
-        if os.path.exists(res["processed"]):
-            with open(res["processed"], "rb") as f:
-                st.download_button(
-                    "Download Processed Image", f.read(),
-                    file_name=f"processed_{res['name']}", mime="image/png",
-                    width='content',
-                )
+            with st.expander(f"📊 {res['label']}", expanded=(i == 0)):
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    st.markdown("##### Original")
+                    try:
+                        st.image(Image.open(res["original"]), use_container_width=True)
+                    except Exception:
+                        st.error("Could not load original.")
+                with col_b:
+                    st.markdown("##### Processed (Cut / Fill)")
+                    try:
+                        st.image(Image.open(res["processed"]), use_container_width=True)
+                    except Exception:
+                        st.error("Could not load result.")
 
-        # Show debug stage images if they were generated
-        dbg = res.get("debug_dir")
-        if dbg and os.path.isdir(dbg):
-            with st.expander("🔬 Debug: Intermediate Pipeline Stages", expanded=False):
-                debug_files = [
-                    ("1_binary.png", "Stage 1 — Binary threshold"),
-                    ("2_grid_detected.png", "Stage 2 — Grid lines detected"),
-                    ("3_after_grid_removal.png", "Stage 3 — After grid removal"),
-                    ("4_design_mask.png", "Stage 4 — Design (solid) mask"),
-                    ("5_dotted_mask.png", "Stage 5 — Ground (dotted) mask"),
-                    ("6_final.png", "Stage 6 — Final output"),
-                ]
-                for fname, caption in debug_files:
-                    fpath = os.path.join(dbg, fname)
-                    if os.path.exists(fpath):
-                        st.markdown(f"**{caption}**")
-                        st.image(Image.open(fpath), width='stretch')
-                        st.markdown("")
+                st.markdown("")
+                if res["processed"] and os.path.exists(res["processed"]):
+                    with open(res["processed"], "rb") as f:
+                        st.download_button(
+                            f"⬇️ Download — {res['label']}", f.read(),
+                            file_name=f"processed_{res['name']}", mime="image/png",
+                            use_container_width=True,
+                            key=f"dl_{i}",
+                        )
+
+                # Show debug stage images if they were generated
+                dbg = res.get("debug_dir")
+                if dbg and os.path.isdir(dbg):
+                    st.markdown("---")
+                    st.markdown("**🔬 Debug: Intermediate Pipeline Stages**")
+                    debug_files = [
+                        ("1_binary.png", "Stage 1 — Binary threshold"),
+                        ("2_grid_detected.png", "Stage 2 — Grid lines detected"),
+                        ("3_after_grid_removal.png", "Stage 3 — After grid removal"),
+                        ("4_design_mask.png", "Stage 4 — Design (solid) mask"),
+                        ("5_dotted_mask.png", "Stage 5 — Ground (dotted) mask"),
+                        ("6_final.png", "Stage 6 — Final output"),
+                    ]
+                    for fname, caption in debug_files:
+                        fpath = os.path.join(dbg, fname)
+                        if os.path.exists(fpath):
+                            st.markdown(f"**{caption}**")
+                            st.image(Image.open(fpath), use_container_width=True)
+                            st.markdown("")
 
 
 # -- Footer --
