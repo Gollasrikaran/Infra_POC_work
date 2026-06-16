@@ -13,9 +13,12 @@ class IdentifiedProfiles:
         self.proposed_grade = None
         self.existing_ground_points = []
         self.proposed_grade_points = []
+        self.existing_ground_score = 0.0
+        self.proposed_grade_score = 0.0
         self.grid_lines = []
         self.noise = []
         self.candidates = []
+        self.scored_list = []       # [(path, score), ...] top candidates
         self.diagnostics = {}
 
 
@@ -52,16 +55,44 @@ class ProfileIdentifier:
             return result
 
         result.candidates = [s[0] for s in scored[:20]]
+        result.scored_list = scored[:10]
+
+        # store top-10 candidate details for debugging
+        diag["top_candidates"] = []
+        for i, (p, s) in enumerate(scored[:10]):
+            diag["top_candidates"].append({
+                "rank": i + 1,
+                "score": round(s, 2),
+                "points": p.point_count,
+                "length": round(p.length, 1),
+                "width": round(p.width, 1),
+                "height": round(p.height, 1),
+                "dashes": p.dashes,
+                "stroke_w": round(p.stroke_width, 2),
+                "color": str(p.color),
+            })
 
         self._classify(scored, result)
 
         if result.existing_ground:
             result.existing_ground_points = sorted(result.existing_ground.points, key=lambda p: p[0])
+            result.existing_ground_score = next(
+                (s for p, s in scored if p is result.existing_ground), 0.0
+            )
         if result.proposed_grade:
             result.proposed_grade_points = sorted(result.proposed_grade.points, key=lambda p: p[0])
+            result.proposed_grade_score = next(
+                (s for p, s in scored if p is result.proposed_grade), 0.0
+            )
 
         diag["existing_ground_points"] = len(result.existing_ground_points)
+        diag["existing_ground_length"] = round(result.existing_ground.length, 1) if result.existing_ground else 0
+        diag["existing_ground_score"] = round(result.existing_ground_score, 2)
+        diag["existing_ground_dashes"] = result.existing_ground.dashes if result.existing_ground else None
         diag["proposed_grade_points"] = len(result.proposed_grade_points)
+        diag["proposed_grade_length"] = round(result.proposed_grade.length, 1) if result.proposed_grade else 0
+        diag["proposed_grade_score"] = round(result.proposed_grade_score, 2)
+        diag["proposed_grade_dashes"] = result.proposed_grade.dashes if result.proposed_grade else None
         result.diagnostics = diag
         return result
 

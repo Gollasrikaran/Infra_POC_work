@@ -1,6 +1,6 @@
 """
 PDF page classifier — figures out which pages are vector vs raster
-and which ones are cross-section drawings (19-series).
+and which ones are cross-section drawings (19-series and 23-series).
 """
 
 import fitz
@@ -114,15 +114,18 @@ class PDFClassifier:
         )
         corner_text = page.get_text("text", clip=corner).strip()
 
+        # look for 19-XXXX or 23-XXXX drawing numbers
         for line in corner_text.split("\n"):
             cleaned = re.sub(r"(?i)DRAWING|NO\.?|DRG|[:\s]", "", line).strip()
-            if (cleaned.startswith("19-") or cleaned.startswith("19")) and "+" not in cleaned:
-                info.drawing_number = cleaned
+            m = re.match(r"((?:19|23)-\d+)", cleaned)
+            if m:
+                info.drawing_number = m.group(1)
                 break
 
         if not info.drawing_number:
             return
 
+        # accept "cross section" or "cross sections" or "staging cross sections"
         if not re.search(r"(?i)cross[-\s]*section", corner_text):
             return
 

@@ -1,6 +1,12 @@
 """
-Converts PDF page coordinates (top-left origin, points) into
-engineering coordinates (station in feet, elevation in feet).
+Converts PDF page coordinates into engineering coordinates for cross-sections.
+
+Cross-section axes:
+  X-axis = offset from centerline (ft), using tick labels -140..0..140
+  Y-axis = elevation (ft), using labels like 650, 660, 670...
+
+Uses known text label positions within each graph region to build
+a precise linear mapping.
 """
 
 import re
@@ -8,32 +14,38 @@ import fitz
 import numpy as np
 
 
-class ScaleInfo:
-    """Everything needed to map PDF coords to engineering coords."""
+class RegionScale:
+    """Mapping parameters for one cross-section graph region."""
 
     def __init__(self):
-        self.h_scale = 10.0
-        self.v_scale = 10.0
-        self.origin_x = 0.0
-        self.origin_y = 0.0
-        self.start_station = 0.0
-        self.base_elevation = 0.0
-        self.ppi = 72.0
+        # offset (X) mapping: PDF x -> offset ft
+        self.x_ticks = []       # [(pdf_x, offset_ft), ...]
+        self.x_slope = 1.0      # offset_ft per PDF pt
+        self.x_intercept = 0.0
+
+        # elevation (Y) mapping: PDF y -> elevation ft
+        self.y_ticks = []       # [(pdf_y, elevation_ft), ...]
+        self.y_slope = -1.0     # elevation per PDF pt (negative: PDF Y is flipped)
+        self.y_intercept = 0.0
+
+        self.h_scale_ft = 10.0  # nominal ft per inch
+        self.v_scale_ft = 10.0
 
 
 class TransformedProfile:
-    """Profile with real station/elevation arrays."""
+    """Profile with real offset/elevation arrays."""
 
-    def __init__(self, stations, elevations, label=""):
-        self.stations = stations
+    def __init__(self, offsets, elevations, label=""):
+        self.offsets = offsets
         self.elevations = elevations
+        self.stations = offsets       # alias for compatibility
         self.label = label
 
     @property
     def station_range(self):
-        if len(self.stations) == 0:
+        if len(self.offsets) == 0:
             return (0.0, 0.0)
-        return (float(self.stations.min()), float(self.stations.max()))
+        return (float(self.offsets.min()), float(self.offsets.max()))
 
     @property
     def elevation_range(self):
@@ -44,101 +56,97 @@ class TransformedProfile:
 
 class CoordinateTransformer:
 
-    def detect_scale(self, page, h_override=None, v_override=None):
-        """Read scale from page text. Overrides win if provided."""
-        rect = page.rect
-        info = ScaleInfo()
+    def build_scale(self, page, region):
+        """Build scale mapping from text labels within a cross-section region."""
+        scale = RegionScale()
 
-        if h_override is not None:
-            info.h_scale = h_override
-        if v_override is not None:
-            info.v_scale = v_override
+        spans = self._get_spans(page)
 
-        if h_override is None or v_override is None:
-            scale_area = fitz.Rect(0, rect.height * 0.70, rect.width, rect.height)
-            text = page.get_text("text", clip=scale_area)
-
-            if h_override is None:
-                m = re.search(r"(?i)HORIZONTAL[:\s]*1\"\s*=\s*(\d+)'?", text)
+        # collect offset tick labels on the X-axis row (at y_bottom)
+        x_ticks = []
+        for y, x, txt, sz in spans:
+            if abs(y - region.y_bottom) < 3.0:
+                m = re.match(r"^(-?\d{1,3})$", txt.strip())
                 if m:
-                    info.h_scale = float(m.group(1))
+                    offset_ft = float(m.group(1))
+                    x_ticks.append((x, offset_ft))
 
-            if v_override is None:
-                m = re.search(r"(?i)VERTICAL[:\s]*1\"\s*=\s*(\d+)'?", text)
+        # collect elevation labels on the left edge within region
+        y_ticks = []
+        for y, x, txt, sz in spans:
+            if region.y_top - 5 <= y <= region.y_bottom + 5 and x < page.rect.width * 0.12:
+                m = re.match(r"^(\d{3,4})$", txt.strip())
                 if m:
-                    info.v_scale = float(m.group(1))
+                    elev_ft = float(m.group(1))
+                    y_ticks.append((y, elev_ft))
 
-        self._read_axis_labels(page, rect, info)
-        return info
+        # fit linear mapping for X: pdf_x -> offset_ft
+        if len(x_ticks) >= 2:
+            scale.x_ticks = x_ticks
+            px = np.array([t[0] for t in x_ticks])
+            ft = np.array([t[1] for t in x_ticks])
+            # least-squares fit
+            A = np.vstack([px, np.ones(len(px))]).T
+            slope, intercept = np.linalg.lstsq(A, ft, rcond=None)[0]
+            scale.x_slope = slope
+            scale.x_intercept = intercept
+
+        # fit linear mapping for Y: pdf_y -> elevation_ft
+        if len(y_ticks) >= 2:
+            scale.y_ticks = y_ticks
+            py = np.array([t[0] for t in y_ticks])
+            ft = np.array([t[1] for t in y_ticks])
+            A = np.vstack([py, np.ones(len(py))]).T
+            slope, intercept = np.linalg.lstsq(A, ft, rcond=None)[0]
+            scale.y_slope = slope
+            scale.y_intercept = intercept
+
+        # read nominal scale from bottom of page
+        self._read_nominal_scale(page, scale)
+
+        return scale
 
     def transform(self, pdf_points, scale, label=""):
-        """Convert list of (x, y) PDF coords into station/elevation arrays."""
+        """Convert list of (x, y) PDF coords into offset/elevation arrays."""
         if not pdf_points:
             return TransformedProfile(np.array([]), np.array([]), label)
 
         pts = np.array(pdf_points)
 
-        x_in = (pts[:, 0] - scale.origin_x) / scale.ppi
-        y_in = (pts[:, 1] - scale.origin_y) / scale.ppi
+        offsets = pts[:, 0] * scale.x_slope + scale.x_intercept
+        elevations = pts[:, 1] * scale.y_slope + scale.y_intercept
 
-        stations = x_in * scale.h_scale + scale.start_station
-        elevations = -y_in * scale.v_scale + scale.base_elevation
-
-        order = np.argsort(stations)
-        stations = stations[order]
+        # sort by offset (left to right)
+        order = np.argsort(offsets)
+        offsets = offsets[order]
         elevations = elevations[order]
 
-        mask = np.diff(stations, prepend=-np.inf) > 0.001
-        return TransformedProfile(stations[mask], elevations[mask], label)
+        # remove duplicate offsets
+        mask = np.diff(offsets, prepend=-np.inf) > 0.01
+        return TransformedProfile(offsets[mask], elevations[mask], label)
 
-    def _read_axis_labels(self, page, rect, info):
-        """Find station labels (bottom) and elevation labels (left) to set origin."""
+    def _read_nominal_scale(self, page, scale):
+        """Read HORIZONTAL/VERTICAL scale text from page bottom."""
+        rect = page.rect
+        bottom = fitz.Rect(0, rect.height * 0.85, rect.width, rect.height)
+        text = page.get_text("text", clip=bottom)
 
-        bottom = fitz.Rect(rect.width * 0.05, rect.height * 0.80, rect.width * 0.95, rect.height)
-        bottom_dict = page.get_text("dict", clip=bottom)
+        m = re.search(r'(?i)HORIZONTAL[:\s]*1"\s*=\s*(\d+)', text)
+        if m:
+            scale.h_scale_ft = float(m.group(1))
 
-        sta_vals, sta_pos = [], []
-        if "blocks" in bottom_dict:
-            for block in bottom_dict["blocks"]:
-                for line in block.get("lines", []):
-                    for span in line["spans"]:
-                        m = re.match(r"(\d+)\+(\d{2})", span["text"].strip())
-                        if m:
-                            sta_ft = int(m.group(1)) * 100 + int(m.group(2))
-                            sta_vals.append(sta_ft)
-                            sta_pos.append(span["origin"][0])
+        m = re.search(r'(?i)VERTICAL[:\s]*1"\s*=\s*(\d+)', text)
+        if m:
+            scale.v_scale_ft = float(m.group(1))
 
-        left = fitz.Rect(0, rect.height * 0.05, rect.width * 0.15, rect.height * 0.85)
-        left_dict = page.get_text("dict", clip=left)
-
-        elev_vals, elev_pos = [], []
-        if "blocks" in left_dict:
-            for block in left_dict["blocks"]:
-                for line in block.get("lines", []):
-                    for span in line["spans"]:
-                        m = re.match(r"^(\d{3,5})$", span["text"].strip())
-                        if m:
-                            elev_vals.append(float(m.group(1)))
-                            elev_pos.append(span["origin"][1])
-
-        if len(sta_vals) >= 2:
-            idx = int(np.argmin(sta_pos))
-            info.origin_x = sta_pos[idx]
-            info.start_station = sta_vals[idx]
-
-            pairs = sorted(zip(sta_pos, sta_vals), key=lambda x: x[0])
-            dx = pairs[-1][0] - pairs[0][0]
-            ds = pairs[-1][1] - pairs[0][1]
-            if dx > 0 and ds > 0:
-                info.h_scale = ds / (dx / info.ppi)
-
-        if len(elev_vals) >= 2:
-            idx = int(np.argmax(elev_pos))
-            info.origin_y = elev_pos[idx]
-            info.base_elevation = elev_vals[idx]
-
-            pairs = sorted(zip(elev_pos, elev_vals), key=lambda x: x[0])
-            dy = abs(pairs[0][0] - pairs[-1][0])
-            de = abs(pairs[0][1] - pairs[-1][1])
-            if dy > 0 and de > 0:
-                info.v_scale = de / (dy / info.ppi)
+    def _get_spans(self, page):
+        text_dict = page.get_text("dict")
+        spans = []
+        for block in text_dict.get("blocks", []):
+            for line in block.get("lines", []):
+                for span in line["spans"]:
+                    txt = span["text"].strip()
+                    if txt:
+                        ox, oy = span["origin"]
+                        spans.append((round(oy, 1), round(ox, 1), txt, round(span["size"], 1)))
+        return spans

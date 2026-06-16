@@ -55,7 +55,22 @@ class GeometryExtractor:
 
     def extract(self, page):
         """Pull all vector paths from a fitz.Page."""
+        return self._build_paths(page.get_drawings())
+
+    def extract_region(self, page, y_top, y_bottom, margin=5.0):
+        """Pull vector paths only from drawings within a Y range."""
         drawings = page.get_drawings()
+        filtered = []
+        for d in drawings:
+            r = d.get("rect")
+            if not r:
+                continue
+            # keep drawings that overlap the region
+            if r.y1 >= (y_top - margin) and r.y0 <= (y_bottom + margin):
+                filtered.append(d)
+        return self._build_paths(filtered)
+
+    def _build_paths(self, drawings):
         paths = []
 
         for idx, drawing in enumerate(drawings):

@@ -1,6 +1,7 @@
 """
-Streamlit app — Direct PDF Vector Extraction pipeline.
-Upload a highway PDF → classify pages → extract profiles → compute cut/fill volumes.
+Streamlit app — Cross-Section Vector Extraction Pipeline.
+Upload a highway PDF → classify pages → split into stations →
+extract profiles → compute cut/fill areas → Average End Area volumes.
 """
 
 import streamlit as st
@@ -9,12 +10,14 @@ import tempfile
 import shutil
 import pandas as pd
 from PIL import Image
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
 
 from orchestrator import VectorPipeline
 from pdf_classifier import PDFClassifier
 
-
-# ── Page config ───────────────────────────────────────────────────────────────
 
 st.set_page_config(
     page_title="XDOT Contractor — Road Quantity Analyzer",
@@ -22,9 +25,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
-
-# ── Theme ─────────────────────────────────────────────────────────────────────
 
 st.markdown("""
 <style>
@@ -44,21 +44,6 @@ st.markdown("""
     color: #fff; padding: .2rem .75rem; border-radius: 20px;
     font-size: .75rem; font-weight: 600; margin-bottom: .75rem; letter-spacing: .5px;
 }
-
-.step-card {
-    background: linear-gradient(145deg,#1e293b,#0f172a);
-    border: 1px solid rgba(99,102,241,0.15); border-radius: 12px;
-    padding: 1.5rem; margin-bottom: 1.25rem;
-}
-.step-card .step-number {
-    display: inline-block; background: linear-gradient(135deg,#6366f1,#8b5cf6);
-    color: #fff; width: 30px; height: 30px; border-radius: 8px;
-    text-align: center; line-height: 30px; font-weight: 700; margin-right: .75rem;
-}
-.step-card .step-title { color: #e2e8f0; font-size: 1.1rem; font-weight: 600; vertical-align: middle; }
-.step-card .step-desc  { color: #94a3b8; font-size: .88rem; margin-top: .75rem; }
-.step-done { border-color: rgba(34,197,94,0.3) !important; }
-.step-done .step-number { background: linear-gradient(135deg,#22c55e,#16a34a) !important; }
 
 .stat-box {
     background: linear-gradient(145deg,#1e293b,#0f172a);
@@ -83,42 +68,23 @@ st.markdown("""
 .vol-card.fill .vol-value { color: #22c55e; }
 .vol-card.net  .vol-value { color: #818cf8; }
 
-.legend-container { display: flex; gap: 1.5rem; margin: 1rem 0; flex-wrap: wrap; }
-.legend-item { display: flex; align-items: center; gap: .5rem; color: #cbd5e1; font-size: .88rem; font-weight: 500; }
-.legend-dot { width: 14px; height: 14px; border-radius: 4px; }
-.legend-dot.red   { background: #ef4444; }
-.legend-dot.green { background: #22c55e; }
-.legend-dot.blue  { background: #3b82f6; }
-.legend-dot.gray  { background: #64748b; }
-
 section[data-testid="stSidebar"] { background: linear-gradient(180deg,#0f172a,#1e293b) !important; }
 
 .stButton > button {
     background: linear-gradient(135deg,#6366f1,#8b5cf6) !important;
     color: #fff !important; border: none !important; border-radius: 10px !important;
     padding: .6rem 1.5rem !important; font-weight: 600 !important;
-    box-shadow: 0 2px 12px rgba(99,102,241,0.3) !important;
 }
-.stButton > button:hover { transform: translateY(-1px) !important; box-shadow: 0 4px 20px rgba(99,102,241,0.5) !important; }
-
 .stDownloadButton > button {
     background: linear-gradient(135deg,#22c55e,#16a34a) !important;
     color: #fff !important; border: none !important; border-radius: 10px !important;
-    font-weight: 600 !important; box-shadow: 0 2px 12px rgba(34,197,94,0.3) !important;
+    font-weight: 600 !important;
 }
-
-[data-testid="stFileUploader"] section {
-    border: 2px dashed rgba(99,102,241,0.3) !important; border-radius: 12px !important;
-    padding: 2rem !important; background: rgba(99,102,241,0.03) !important;
-}
-.stProgress > div > div { background: linear-gradient(90deg,#6366f1,#8b5cf6) !important; border-radius: 8px !important; }
 hr { border-color: rgba(99,102,241,0.1) !important; margin: 1.5rem 0 !important; }
 </style>
 """, unsafe_allow_html=True)
 
-
-# ── State ─────────────────────────────────────────────────────────────────────
-
+# state
 for key, default in {
     "pdf_path": None, "pdf_name": None, "doc_analysis": None,
     "selected_pages": [], "pipeline_result": None, "work_dir": None,
@@ -133,49 +99,22 @@ def get_work_dir():
     return st.session_state.work_dir
 
 
-# ── Sidebar ───────────────────────────────────────────────────────────────────
-
+# sidebar
 with st.sidebar:
-    st.markdown("## 🛣️ Vector Pipeline")
-
-    steps = [
-        ("1", "Upload & Classify", "Upload PDF, analyze structure",
-         st.session_state.doc_analysis is not None),
-        ("2", "Select Pages", "Choose pages to process",
-         len(st.session_state.selected_pages) > 0),
-        ("3", "Run Pipeline", "Extract profiles, compute volumes",
-         st.session_state.pipeline_result is not None),
-        ("4", "Results", "View volumes, plots, reports",
-         st.session_state.pipeline_result is not None
-         and len(getattr(st.session_state.pipeline_result, "successful_pages", [])) > 0),
-    ]
-    for num, title, desc, done in steps:
-        cls = "step-card step-done" if done else "step-card"
-        mark = " ✓" if done else ""
-        st.markdown(f"""
-        <div class="{cls}">
-            <span class="step-number">{num}</span>
-            <span class="step-title">{title}{mark}</span>
-            <div class="step-desc">{desc}</div>
-        </div>""", unsafe_allow_html=True)
-
-    st.divider()
+    st.markdown("## 🛣️ Cross-Section Pipeline")
 
     if st.session_state.doc_analysis:
         da = st.session_state.doc_analysis
-        with st.expander("📊 Page Classification", expanded=False):
-            st.markdown(f"""
-            | Type | Count |
-            |------|-------|
-            | 🟢 Vector | **{len(da.vector_pages)}** |
-            | 🟡 Hybrid | **{len(da.hybrid_pages)}** |
-            | 🔴 Raster | **{len(da.raster_pages)}** |
-            | 📐 Cross-Section | **{len(da.cross_section_pages)}** |
-            """)
+        st.markdown(f"**{da.total_pages}** pages | **{len(da.cross_section_pages)}** cross-section pages")
+
+    if st.session_state.pipeline_result:
+        pr = st.session_state.pipeline_result
+        ok = len(pr.successful_stations)
+        fail = len(pr.failed_stations)
+        st.markdown(f"**{ok}** stations OK | **{fail}** failed")
 
     st.divider()
-
-    if st.button("🔄 Reset Pipeline", use_container_width=True):
+    if st.button("🔄 Reset", use_container_width=True):
         if st.session_state.work_dir and os.path.exists(st.session_state.work_dir):
             shutil.rmtree(st.session_state.work_dir, ignore_errors=True)
         for k in list(st.session_state.keys()):
@@ -183,19 +122,16 @@ with st.sidebar:
         st.rerun()
 
 
-# ── Header ────────────────────────────────────────────────────────────────────
-
+# header
 st.markdown("""
 <div class="main-header">
-    <div class="badge">APPROACH 2 — DIRECT PDF VECTOR EXTRACTION</div>
+    <div class="badge">CROSS-SECTION VECTOR EXTRACTION</div>
     <h1>🛣️ Road Quantity Analyzer</h1>
-    <p>Extract profile geometry from CAD-generated PDFs and compute earthwork cut/fill volumes.</p>
+    <p>Extract cross-section profiles from CAD PDFs. Compute cut/fill areas per station and volumes via Average End Area.</p>
 </div>""", unsafe_allow_html=True)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# STEP 1 — Upload & Classify
-# ══════════════════════════════════════════════════════════════════════════════
+# ── Step 1: Upload ──────────────────────────────────────────────────────────
 
 st.markdown("### Step 1 — Upload & Classify PDF")
 
@@ -213,19 +149,14 @@ if pdf_file is not None:
 
     if st.session_state.doc_analysis is None:
         st.success(f"✅ **{pdf_file.name}** uploaded.")
-        if st.button("🔍 Analyze PDF Structure", key="btn_classify", use_container_width=True):
-            with st.spinner("Analyzing PDF pages..."):
+        if st.button("🔍 Analyze PDF", key="btn_classify", use_container_width=True):
+            with st.spinner("Analyzing..."):
                 classifier = PDFClassifier(st.session_state.pdf_path)
                 st.session_state.doc_analysis = classifier.analyze()
             st.rerun()
     else:
         da = st.session_state.doc_analysis
-        st.success(f"✅ **{da.total_pages}** pages analyzed in **{st.session_state.pdf_name}**")
-
-        with st.expander("📋 Full Page Classification Table", expanded=False):
-            classifier = PDFClassifier(st.session_state.pdf_path)
-            st.dataframe(pd.DataFrame(classifier.to_dict_list(da)),
-                         use_container_width=True, hide_index=True)
+        st.success(f"✅ **{da.total_pages}** pages analyzed")
 
         c1, c2, c3, c4 = st.columns(4)
         with c1:
@@ -233,80 +164,48 @@ if pdf_file is not None:
                         '<div class="stat-label">Total Pages</div></div>', unsafe_allow_html=True)
         with c2:
             st.markdown(f'<div class="stat-box"><div class="stat-value">{len(da.vector_pages)}</div>'
-                        '<div class="stat-label">Vector Pages</div></div>', unsafe_allow_html=True)
+                        '<div class="stat-label">Vector</div></div>', unsafe_allow_html=True)
         with c3:
             st.markdown(f'<div class="stat-box"><div class="stat-value">{len(da.cross_section_pages)}</div>'
-                        '<div class="stat-label">Cross-Sections</div></div>', unsafe_allow_html=True)
+                        '<div class="stat-label">Cross-Section</div></div>', unsafe_allow_html=True)
         with c4:
             st.markdown(f'<div class="stat-box"><div class="stat-value">{len(da.processable_pages)}</div>'
                         '<div class="stat-label">Processable</div></div>', unsafe_allow_html=True)
 
+        with st.expander("📋 Page Classification", expanded=False):
+            classifier = PDFClassifier(st.session_state.pdf_path)
+            st.dataframe(pd.DataFrame(classifier.to_dict_list(da)),
+                         use_container_width=True, hide_index=True)
+
 st.divider()
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# STEP 2 — Select Pages
-# ══════════════════════════════════════════════════════════════════════════════
+# ── Step 2: Select Pages ─────────────────────────────────────────────────────
 
-st.markdown("### Step 2 — Select Pages to Process")
+st.markdown("### Step 2 — Select Pages")
 
 if not st.session_state.doc_analysis:
-    st.info("Upload and analyze a PDF in Step 1.")
+    st.info("Upload and analyze a PDF first.")
 else:
     da = st.session_state.doc_analysis
     processable = da.processable_pages
 
     if not processable:
         st.warning("No processable cross-section pages found.")
-        all_vec = [p for p in da.pages if p.classification in ("VECTOR", "HYBRID")]
-        if all_vec:
-            st.info(f"Found {len(all_vec)} vector/hybrid pages — select manually:")
-            selected = st.multiselect("Select pages", [p.page_number for p in all_vec],
-                                      default=[], key="manual_page_select")
-            if selected:
-                st.session_state.selected_pages = selected
     else:
-        st.markdown(f"**{len(processable)}** pages ready for vector extraction.")
         page_nums = [p.page_number for p in processable]
+        st.markdown(f"**{len(processable)}** cross-section pages ready.")
 
-        col_a, col_b = st.columns([3, 1])
-        with col_a:
-            selected = st.multiselect("Select pages (all by default)", page_nums,
-                                      default=page_nums, key="page_select")
-            st.session_state.selected_pages = selected
-        with col_b:
-            st.markdown("")
-            st.markdown("")
-            if st.button("Select All", key="btn_all"):
-                st.session_state.selected_pages = page_nums
-                st.rerun()
-
-        with st.expander("⚙️ Scale Overrides (optional)", expanded=False):
-            st.markdown("Leave at **0** to auto-detect from PDF text.")
-            sc1, sc2 = st.columns(2)
-            with sc1:
-                h_over = st.number_input("Horizontal Scale (ft/inch)", min_value=0.0,
-                                         value=0.0, step=1.0, key="h_scale_override")
-            with sc2:
-                v_over = st.number_input("Vertical Scale (ft/inch)", min_value=0.0,
-                                         value=0.0, step=1.0, key="v_scale_override")
+        selected = st.multiselect("Select pages", page_nums,
+                                  default=page_nums, key="page_select")
+        st.session_state.selected_pages = selected
 
 st.divider()
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# STEP 3 — Run Pipeline
-# ══════════════════════════════════════════════════════════════════════════════
+# ── Step 3: Run ──────────────────────────────────────────────────────────────
 
-st.markdown("### Step 3 — Run Vector Pipeline")
-
-st.markdown("""
-<div class="legend-container">
-    <div class="legend-item"><span class="legend-dot red"></span>Cut (Excavation)</div>
-    <div class="legend-item"><span class="legend-dot green"></span>Fill (Embankment)</div>
-    <div class="legend-item"><span class="legend-dot blue"></span>Proposed Grade</div>
-    <div class="legend-item"><span class="legend-dot gray"></span>Existing Ground</div>
-</div>""", unsafe_allow_html=True)
+st.markdown("### Step 3 — Run Pipeline")
 
 if not st.session_state.selected_pages:
     st.info("Select pages in Step 2.")
@@ -314,23 +213,20 @@ elif st.session_state.pipeline_result is None:
     pages = st.session_state.selected_pages
     st.markdown(f"Ready to process **{len(pages)}** page(s).")
 
-    with st.expander("⚙️ Pipeline Settings", expanded=False):
+    with st.expander("⚙️ Settings", expanded=False):
         s1, s2 = st.columns(2)
         with s1:
-            interval = st.number_input("Station Interval (ft)", min_value=0.1,
-                                       value=1.0, step=0.5, key="station_interval")
+            interval = st.number_input("Offset Interval (ft)", min_value=0.1,
+                                       value=1.0, step=0.5, key="offset_interval")
         with s2:
             method = st.selectbox("Interpolation", ["linear", "cubic"], index=0, key="interp_method")
 
-    if st.button(f"🚀 Run Pipeline on {len(pages)} Page(s)", key="btn_run", use_container_width=True):
+    if st.button(f"🚀 Run on {len(pages)} Pages", key="btn_run", use_container_width=True):
         report_dir = os.path.join(get_work_dir(), "reports")
         os.makedirs(report_dir, exist_ok=True)
 
-        h_s = st.session_state.get("h_scale_override", 0.0)
-        v_s = st.session_state.get("v_scale_override", 0.0)
-
         pipeline = VectorPipeline(
-            station_interval=st.session_state.get("station_interval", 1.0),
+            offset_interval=st.session_state.get("offset_interval", 1.0),
             interpolation_method=st.session_state.get("interp_method", "linear"),
             output_dir=report_dir,
         )
@@ -339,9 +235,7 @@ elif st.session_state.pipeline_result is None:
         result = pipeline.run(
             pdf_path=st.session_state.pdf_path,
             page_numbers=pages,
-            h_scale_override=h_s if h_s > 0 else None,
-            v_scale_override=v_s if v_s > 0 else None,
-            progress_callback=lambda c, t, m: bar.progress(c / max(t, 1), text=m),
+            progress_callback=lambda c, t, m: bar.progress(min(c / max(t, 1), 1.0), text=m),
         )
         bar.progress(1.0, text="Done!")
 
@@ -349,20 +243,17 @@ elif st.session_state.pipeline_result is None:
         st.rerun()
 else:
     result = st.session_state.pipeline_result
-    ok = len(result.successful_pages)
-    fail = len(result.failed_pages)
-
+    ok = len(result.successful_stations)
+    fail = len(result.failed_stations)
     if ok > 0:
-        st.success(f"✅ **{ok}/{len(result.page_results)}** pages processed.")
+        st.success(f"✅ **{ok}** stations processed successfully.")
     if fail > 0:
-        st.warning(f"⚠️ **{fail}** page(s) had errors.")
+        st.warning(f"⚠️ **{fail}** station(s) failed.")
 
 st.divider()
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# STEP 4 — Results
-# ══════════════════════════════════════════════════════════════════════════════
+# ── Step 4: Results ──────────────────────────────────────────────────────────
 
 st.markdown("### Step 4 — Results")
 
@@ -371,95 +262,231 @@ if st.session_state.pipeline_result is None:
 else:
     result = st.session_state.pipeline_result
 
-    # aggregate volume cards
-    if result.successful_pages:
-        st.markdown("#### 📊 Aggregate Volumes")
+    # volume cards
+    if result.earthwork and len(result.earthwork.station_areas) >= 2:
+        ew = result.earthwork
+        st.markdown("#### 📊 Aggregate Volumes (Average End Area)")
         v1, v2, v3 = st.columns(3)
         with v1:
             st.markdown(f'<div class="vol-card cut"><div class="vol-value">'
-                        f'{result.total_cut_volume_cy:,.1f}</div>'
+                        f'{ew.total_cut_volume_cy:,.1f}</div>'
                         '<div class="vol-unit">cu yd</div>'
                         '<div class="vol-label">Total Cut</div></div>', unsafe_allow_html=True)
         with v2:
             st.markdown(f'<div class="vol-card fill"><div class="vol-value">'
-                        f'{result.total_fill_volume_cy:,.1f}</div>'
+                        f'{ew.total_fill_volume_cy:,.1f}</div>'
                         '<div class="vol-unit">cu yd</div>'
                         '<div class="vol-label">Total Fill</div></div>', unsafe_allow_html=True)
         with v3:
-            net = result.total_cut_volume_cy - result.total_fill_volume_cy
             st.markdown(f'<div class="vol-card net"><div class="vol-value">'
-                        f'{net:,.1f}</div>'
+                        f'{ew.net_volume_cy:,.1f}</div>'
                         '<div class="vol-unit">cu yd</div>'
                         '<div class="vol-label">Net (Cut − Fill)</div></div>', unsafe_allow_html=True)
+
         st.markdown("")
 
-    # per-page results
-    for pr in result.page_results:
-        if pr.success:
-            with st.expander(f"📊 {pr.page_label} — ✅", expanded=(len(result.page_results) == 1)):
-                if pr.earthwork:
-                    pc1, pc2, pc3 = st.columns(3)
-                    with pc1:
-                        st.metric("Cut", f"{pr.earthwork.total_cut_volume_cy:,.2f} cu yd")
-                    with pc2:
-                        st.metric("Fill", f"{pr.earthwork.total_fill_volume_cy:,.2f} cu yd")
-                    with pc3:
-                        st.metric("Net", f"{pr.earthwork.net_volume_cy:,.2f} cu yd")
+        # aggregate plot
+        if result.plot_path and os.path.exists(result.plot_path):
+            st.image(Image.open(result.plot_path), use_container_width=True)
 
-                if pr.plot_path and os.path.exists(pr.plot_path):
-                    st.image(Image.open(pr.plot_path), use_container_width=True)
+        # area table
+        with st.expander("📋 Cut/Fill Areas per Station", expanded=True):
+            st.dataframe(ew.to_area_dataframe(), use_container_width=True, hide_index=True)
 
-                if pr.validation:
-                    for w in pr.validation.warnings:
-                        st.warning(f"⚠️ {w}")
-                    for e in pr.validation.errors:
-                        st.error(f"❌ {e}")
-                    if pr.validation.is_valid and not pr.validation.warnings:
-                        st.success("✅ All checks passed.")
+        # volume segments table
+        with st.expander("📋 Segment Volumes (Average End Area)", expanded=False):
+            st.dataframe(ew.to_volume_dataframe(), use_container_width=True, hide_index=True)
 
-                if pr.earthwork:
-                    with st.expander("📋 Station Data"):
-                        st.dataframe(pr.earthwork.to_dataframe(), use_container_width=True, hide_index=True)
-                    with st.expander("📋 Segment Volumes"):
-                        st.dataframe(pr.earthwork.to_volume_dataframe(), use_container_width=True, hide_index=True)
+        # downloads
+        dl1, dl2 = st.columns(2)
+        if result.csv_report_path and os.path.exists(result.csv_report_path):
+            with dl1:
+                with open(result.csv_report_path, "rb") as f:
+                    st.download_button("⬇️ Download CSV", f.read(),
+                                       os.path.basename(result.csv_report_path),
+                                       "text/csv", use_container_width=True, key="dl_csv")
+        if result.json_report_path and os.path.exists(result.json_report_path):
+            with dl2:
+                with open(result.json_report_path, "rb") as f:
+                    st.download_button("⬇️ Download JSON", f.read(),
+                                       os.path.basename(result.json_report_path),
+                                       "application/json", use_container_width=True, key="dl_json")
 
-                # downloads
-                dl1, dl2, dl3 = st.columns(3)
-                for col, path, label, mime, key_suffix in [
-                    (dl1, pr.csv_report_path, "⬇️ CSV", "text/csv", "csv"),
-                    (dl2, pr.json_report_path, "⬇️ JSON", "application/json", "json"),
-                    (dl3, pr.plot_path, "⬇️ Plot", "image/png", "plot"),
-                ]:
-                    if path and os.path.exists(path):
-                        with col:
-                            with open(path, "rb") as f:
-                                st.download_button(label, f.read(), os.path.basename(path),
-                                                   mime, use_container_width=True,
-                                                   key=f"dl_{key_suffix}_{pr.page_number}")
+    elif result.earthwork and len(result.earthwork.station_areas) == 1:
+        st.warning("Only 1 station found — need at least 2 for volume calculation.")
 
-                with st.expander("🔧 Diagnostics"):
-                    diag = {"classification": pr.classification, "workflow": pr.workflow,
-                            "stage": pr.stage_reached}
-                    if pr.scale:
-                        diag["h_scale"] = f"{pr.scale.h_scale} ft/in"
-                        diag["v_scale"] = f"{pr.scale.v_scale} ft/in"
-                        diag["origin"] = (pr.scale.origin_x, pr.scale.origin_y)
-                        diag["start_station"] = pr.scale.start_station
-                        diag["base_elevation"] = pr.scale.base_elevation
-                    if pr.profiles and pr.profiles.diagnostics:
-                        diag.update(pr.profiles.diagnostics)
-                    if pr.earthwork and pr.earthwork.diagnostics:
-                        diag["earthwork"] = pr.earthwork.diagnostics
-                    st.json(diag)
+    st.divider()
 
+    # per-station details
+    st.markdown("#### 📐 Per-Station Details")
+
+    for sr in result.station_results:
+        if sr.success:
+            icon = "✅"
+            title = f"{icon} STA {sr.station_label} (Page {sr.page_number})"
+            with st.expander(title, expanded=False):
+                if sr.station_area:
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        st.metric("Cut Area", f"{sr.station_area.cut_area:,.1f} sq ft")
+                    with c2:
+                        st.metric("Fill Area", f"{sr.station_area.fill_area:,.1f} sq ft")
+                    with c3:
+                        st.metric("Net Area", f"{sr.station_area.net_area:,.1f} sq ft")
+
+                # validation plot
+                if sr.normalized:
+                    fig, ax = plt.subplots(figsize=(12, 5))
+
+                    offsets = sr.normalized.stations
+                    ex = sr.normalized.existing_elevations
+                    pr = sr.normalized.proposed_elevations
+                    diff = pr - ex
+
+                    ax.plot(offsets, ex, color="#6b7280", lw=1.8, ls="--",
+                            label="Existing Ground", zorder=3)
+                    ax.plot(offsets, pr, color="#3b82f6", lw=2.2, ls="-",
+                            label="Proposed Grade", zorder=3)
+
+                    ax.fill_between(offsets, ex, pr, where=(diff < 0), interpolate=True,
+                                    color="#ef4444", alpha=0.25, label="Cut", zorder=2)
+                    ax.fill_between(offsets, ex, pr, where=(diff > 0), interpolate=True,
+                                    color="#22c55e", alpha=0.25, label="Fill", zorder=2)
+
+                    # centerline marker
+                    ax.axvline(x=0, color="#94a3b8", lw=0.8, ls=":", alpha=0.6)
+                    ax.text(0, ax.get_ylim()[1], " CL", fontsize=8, color="#94a3b8",
+                            va="top", ha="left")
+
+                    ax.set_xlabel("Offset from Centerline (ft)", fontsize=11, fontweight="600")
+                    ax.set_ylabel("Elevation (ft)", fontsize=11, fontweight="600")
+                    ax.set_title(f"Validation Plot — STA {sr.station_label}",
+                                 fontsize=13, fontweight="700", pad=10)
+                    ax.legend(loc="upper right", fontsize=9, framealpha=0.9)
+                    ax.grid(True, alpha=0.2, lw=0.5)
+                    ax.set_facecolor("#f8fafc")
+
+                    # area annotation
+                    if sr.station_area:
+                        note = (
+                            f"Cut: {sr.station_area.cut_area:,.1f} sq ft  |  "
+                            f"Fill: {sr.station_area.fill_area:,.1f} sq ft  |  "
+                            f"Net: {sr.station_area.net_area:,.1f} sq ft"
+                        )
+                        ax.text(0.5, -0.13, note, transform=ax.transAxes,
+                                ha="center", fontsize=10, color="#475569", fontweight="500")
+
+                    plt.tight_layout()
+                    st.pyplot(fig)
+                    plt.close(fig)
+
+                if sr.station_area and sr.station_area.diagnostics:
+                    with st.expander("🔧 Diagnostics & Profile Verification"):
+                        # profile summary metrics
+                        st.markdown("**Profile Selection Summary**")
+                        prof_data = []
+                        if sr.profiles and sr.profiles.existing_ground:
+                            eg = sr.profiles.existing_ground
+                            prof_data.append({
+                                "Profile": "Existing Ground",
+                                "Points": eg.point_count,
+                                "Length (pt)": round(eg.length, 1),
+                                "Width (pt)": round(eg.width, 1),
+                                "Height (pt)": round(eg.height, 1),
+                                "Score": round(sr.profiles.existing_ground_score, 2),
+                                "Dashes": str(eg.dashes) if eg.dashes else "None (solid)",
+                                "Stroke Width": round(eg.stroke_width, 2),
+                                "Color": str(eg.color),
+                            })
+                        if sr.profiles and sr.profiles.proposed_grade:
+                            pg = sr.profiles.proposed_grade
+                            prof_data.append({
+                                "Profile": "Proposed Grade",
+                                "Points": pg.point_count,
+                                "Length (pt)": round(pg.length, 1),
+                                "Width (pt)": round(pg.width, 1),
+                                "Height (pt)": round(pg.height, 1),
+                                "Score": round(sr.profiles.proposed_grade_score, 2),
+                                "Dashes": str(pg.dashes) if pg.dashes else "None (solid)",
+                                "Stroke Width": round(pg.stroke_width, 2),
+                                "Color": str(pg.color),
+                            })
+                        if prof_data:
+                            st.dataframe(pd.DataFrame(prof_data), use_container_width=True, hide_index=True)
+
+                        # raw polyline plot (PDF coordinates)
+                        st.markdown("**Raw Candidate Polylines (PDF Coordinates)**")
+                        fig2, ax2 = plt.subplots(figsize=(12, 5))
+
+                        if sr.profiles and sr.profiles.existing_ground:
+                            eg_pts = sr.profiles.existing_ground_points
+                            if eg_pts:
+                                xs = [p[0] for p in eg_pts]
+                                ys = [p[1] for p in eg_pts]
+                                ax2.plot(xs, ys, color="#6b7280", lw=2.0, ls="--",
+                                         label=f"Existing Ground ({len(eg_pts)} pts, score={sr.profiles.existing_ground_score:.1f})",
+                                         zorder=3)
+
+                        if sr.profiles and sr.profiles.proposed_grade:
+                            pg_pts = sr.profiles.proposed_grade_points
+                            if pg_pts:
+                                xs = [p[0] for p in pg_pts]
+                                ys = [p[1] for p in pg_pts]
+                                ax2.plot(xs, ys, color="#3b82f6", lw=2.0, ls="-",
+                                         label=f"Proposed Grade ({len(pg_pts)} pts, score={sr.profiles.proposed_grade_score:.1f})",
+                                         zorder=3)
+
+                        ax2.set_xlabel("PDF X (pt)", fontsize=10)
+                        ax2.set_ylabel("PDF Y (pt)", fontsize=10)
+                        ax2.set_title(f"Raw PDF Polylines — STA {sr.station_label}", fontsize=12, fontweight="600")
+                        ax2.legend(fontsize=8, loc="best")
+                        ax2.grid(True, alpha=0.2)
+                        ax2.invert_yaxis()  # PDF Y is top-down
+                        ax2.set_facecolor("#fefce8")
+                        plt.tight_layout()
+                        st.pyplot(fig2)
+                        plt.close(fig2)
+
+                        # top candidates table
+                        if sr.profiles and sr.profiles.diagnostics.get("top_candidates"):
+                            st.markdown("**Top 10 Scored Candidates**")
+                            st.dataframe(pd.DataFrame(sr.profiles.diagnostics["top_candidates"]),
+                                         use_container_width=True, hide_index=True)
+
+                        # region/scale info
+                        st.markdown("**Scale & Region**")
+                        info = {
+                            "station": sr.station_label,
+                            "station_ft": sr.station_ft,
+                            "page": sr.page_number,
+                            "drawing": sr.drawing_number,
+                        }
+                        if sr.region:
+                            info["region_y"] = f"{sr.region.y_top:.0f} — {sr.region.y_bottom:.0f}"
+                        if sr.scale:
+                            info["x_ticks_count"] = len(sr.scale.x_ticks)
+                            info["y_ticks_count"] = len(sr.scale.y_ticks)
+                            info["x_slope"] = f"{sr.scale.x_slope:.6f}"
+                            info["x_intercept"] = f"{sr.scale.x_intercept:.2f}"
+                            info["y_slope"] = f"{sr.scale.y_slope:.6f}"
+                            info["y_intercept"] = f"{sr.scale.y_intercept:.2f}"
+                        info.update(sr.station_area.diagnostics)
+                        st.json(info)
         else:
-            with st.expander(f"❌ {pr.page_label} — Failed [{pr.stage_reached}]"):
-                st.error(pr.error)
+            title = f"❌ STA {sr.station_label} (Page {sr.page_number}) — {sr.stage_reached}"
+            with st.expander(title, expanded=False):
+                st.error(sr.error)
+
+    # failed stations summary
+    if result.failed_stations:
+        st.divider()
+        st.markdown("#### ⚠️ Failed Stations")
+        for sr in result.failed_stations:
+            st.error(f"STA {sr.station_label} (Page {sr.page_number}): {sr.error}")
 
 
-# ── Footer ────────────────────────────────────────────────────────────────────
-
+# footer
 st.markdown("---")
 st.markdown("<p style='text-align:center; color:#64748b; font-size:.8rem;'>"
-            "XDOT Contractor — Approach 2: Direct PDF Vector Extraction</p>",
+            "XDOT Contractor — Cross-Section Vector Extraction Pipeline</p>",
             unsafe_allow_html=True)
