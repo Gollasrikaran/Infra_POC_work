@@ -1,0 +1,1838 @@
+[
+    {
+        "page_number": 1,
+        "drawings_count": 24995,
+        "images_count": 1,
+        "text_blocks_count": 258,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "HYBRID"
+    },
+    {
+        "page_number": 2,
+        "drawings_count": 1871,
+        "images_count": 5,
+        "text_blocks_count": 57,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "HYBRID"
+    },
+    {
+        "page_number": 3,
+        "drawings_count": 2853,
+        "images_count": 0,
+        "text_blocks_count": 124,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 4,
+        "drawings_count": 463,
+        "images_count": 0,
+        "text_blocks_count": 33,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 5,
+        "drawings_count": 4458,
+        "images_count": 15,
+        "text_blocks_count": 65,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "HYBRID"
+    },
+    {
+        "page_number": 6,
+        "drawings_count": 1582,
+        "images_count": 0,
+        "text_blocks_count": 150,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 7,
+        "drawings_count": 4255,
+        "images_count": 0,
+        "text_blocks_count": 107,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 8,
+        "drawings_count": 3587,
+        "images_count": 0,
+        "text_blocks_count": 253,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 9,
+        "drawings_count": 1239,
+        "images_count": 0,
+        "text_blocks_count": 60,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 10,
+        "drawings_count": 316,
+        "images_count": 64,
+        "text_blocks_count": 32,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "HYBRID"
+    },
+    {
+        "page_number": 11,
+        "drawings_count": 307,
+        "images_count": 45,
+        "text_blocks_count": 44,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "HYBRID"
+    },
+    {
+        "page_number": 12,
+        "drawings_count": 309,
+        "images_count": 40,
+        "text_blocks_count": 24,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "HYBRID"
+    },
+    {
+        "page_number": 13,
+        "drawings_count": 307,
+        "images_count": 32,
+        "text_blocks_count": 33,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "HYBRID"
+    },
+    {
+        "page_number": 14,
+        "drawings_count": 563,
+        "images_count": 0,
+        "text_blocks_count": 49,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 15,
+        "drawings_count": 555,
+        "images_count": 0,
+        "text_blocks_count": 45,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 16,
+        "drawings_count": 1928,
+        "images_count": 0,
+        "text_blocks_count": 98,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 17,
+        "drawings_count": 4120,
+        "images_count": 0,
+        "text_blocks_count": 129,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 18,
+        "drawings_count": 5414,
+        "images_count": 0,
+        "text_blocks_count": 163,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 19,
+        "drawings_count": 5062,
+        "images_count": 0,
+        "text_blocks_count": 100,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 20,
+        "drawings_count": 15141,
+        "images_count": 0,
+        "text_blocks_count": 105,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 21,
+        "drawings_count": 7113,
+        "images_count": 0,
+        "text_blocks_count": 94,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 22,
+        "drawings_count": 44889,
+        "images_count": 0,
+        "text_blocks_count": 81,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 23,
+        "drawings_count": 29847,
+        "images_count": 0,
+        "text_blocks_count": 89,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 24,
+        "drawings_count": 5256,
+        "images_count": 0,
+        "text_blocks_count": 71,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 25,
+        "drawings_count": 1317,
+        "images_count": 0,
+        "text_blocks_count": 71,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 26,
+        "drawings_count": 1101,
+        "images_count": 0,
+        "text_blocks_count": 97,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 27,
+        "drawings_count": 1062,
+        "images_count": 0,
+        "text_blocks_count": 103,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 28,
+        "drawings_count": 948,
+        "images_count": 0,
+        "text_blocks_count": 96,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 29,
+        "drawings_count": 1388,
+        "images_count": 0,
+        "text_blocks_count": 111,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 30,
+        "drawings_count": 1225,
+        "images_count": 0,
+        "text_blocks_count": 107,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 31,
+        "drawings_count": 1128,
+        "images_count": 0,
+        "text_blocks_count": 106,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 32,
+        "drawings_count": 958,
+        "images_count": 0,
+        "text_blocks_count": 81,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 33,
+        "drawings_count": 2092,
+        "images_count": 0,
+        "text_blocks_count": 109,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 34,
+        "drawings_count": 1195,
+        "images_count": 0,
+        "text_blocks_count": 74,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 35,
+        "drawings_count": 21500,
+        "images_count": 0,
+        "text_blocks_count": 262,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 36,
+        "drawings_count": 10907,
+        "images_count": 0,
+        "text_blocks_count": 129,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 37,
+        "drawings_count": 7574,
+        "images_count": 0,
+        "text_blocks_count": 130,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 38,
+        "drawings_count": 12384,
+        "images_count": 0,
+        "text_blocks_count": 81,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 39,
+        "drawings_count": 13624,
+        "images_count": 0,
+        "text_blocks_count": 96,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 40,
+        "drawings_count": 7593,
+        "images_count": 0,
+        "text_blocks_count": 89,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 41,
+        "drawings_count": 50802,
+        "images_count": 0,
+        "text_blocks_count": 81,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 42,
+        "drawings_count": 30517,
+        "images_count": 0,
+        "text_blocks_count": 71,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 43,
+        "drawings_count": 1826,
+        "images_count": 0,
+        "text_blocks_count": 63,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 44,
+        "drawings_count": 1548,
+        "images_count": 0,
+        "text_blocks_count": 64,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 45,
+        "drawings_count": 1563,
+        "images_count": 0,
+        "text_blocks_count": 84,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 46,
+        "drawings_count": 2243,
+        "images_count": 0,
+        "text_blocks_count": 109,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 47,
+        "drawings_count": 2752,
+        "images_count": 0,
+        "text_blocks_count": 133,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 48,
+        "drawings_count": 2195,
+        "images_count": 0,
+        "text_blocks_count": 106,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 49,
+        "drawings_count": 2277,
+        "images_count": 0,
+        "text_blocks_count": 113,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 50,
+        "drawings_count": 1882,
+        "images_count": 0,
+        "text_blocks_count": 97,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 51,
+        "drawings_count": 1875,
+        "images_count": 0,
+        "text_blocks_count": 99,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 52,
+        "drawings_count": 1816,
+        "images_count": 0,
+        "text_blocks_count": 95,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 53,
+        "drawings_count": 1908,
+        "images_count": 0,
+        "text_blocks_count": 93,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 54,
+        "drawings_count": 1511,
+        "images_count": 0,
+        "text_blocks_count": 79,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 55,
+        "drawings_count": 1580,
+        "images_count": 0,
+        "text_blocks_count": 83,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 56,
+        "drawings_count": 1224,
+        "images_count": 0,
+        "text_blocks_count": 70,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 57,
+        "drawings_count": 1695,
+        "images_count": 0,
+        "text_blocks_count": 91,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 58,
+        "drawings_count": 1864,
+        "images_count": 0,
+        "text_blocks_count": 93,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 59,
+        "drawings_count": 1929,
+        "images_count": 0,
+        "text_blocks_count": 94,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 60,
+        "drawings_count": 1834,
+        "images_count": 0,
+        "text_blocks_count": 95,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 61,
+        "drawings_count": 1789,
+        "images_count": 0,
+        "text_blocks_count": 92,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 62,
+        "drawings_count": 1746,
+        "images_count": 0,
+        "text_blocks_count": 84,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 63,
+        "drawings_count": 1729,
+        "images_count": 0,
+        "text_blocks_count": 84,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 64,
+        "drawings_count": 1699,
+        "images_count": 0,
+        "text_blocks_count": 84,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 65,
+        "drawings_count": 1712,
+        "images_count": 0,
+        "text_blocks_count": 84,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 66,
+        "drawings_count": 1709,
+        "images_count": 0,
+        "text_blocks_count": 84,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 67,
+        "drawings_count": 1625,
+        "images_count": 0,
+        "text_blocks_count": 86,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 68,
+        "drawings_count": 1487,
+        "images_count": 0,
+        "text_blocks_count": 76,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 69,
+        "drawings_count": 764,
+        "images_count": 0,
+        "text_blocks_count": 46,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 70,
+        "drawings_count": 7565,
+        "images_count": 0,
+        "text_blocks_count": 124,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 71,
+        "drawings_count": 12894,
+        "images_count": 0,
+        "text_blocks_count": 155,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 72,
+        "drawings_count": 8311,
+        "images_count": 0,
+        "text_blocks_count": 82,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 73,
+        "drawings_count": 14196,
+        "images_count": 0,
+        "text_blocks_count": 99,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 74,
+        "drawings_count": 6322,
+        "images_count": 0,
+        "text_blocks_count": 77,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 75,
+        "drawings_count": 48452,
+        "images_count": 0,
+        "text_blocks_count": 81,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 76,
+        "drawings_count": 33058,
+        "images_count": 0,
+        "text_blocks_count": 74,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 77,
+        "drawings_count": 1994,
+        "images_count": 0,
+        "text_blocks_count": 70,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 78,
+        "drawings_count": 1721,
+        "images_count": 0,
+        "text_blocks_count": 75,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 79,
+        "drawings_count": 25272,
+        "images_count": 0,
+        "text_blocks_count": 269,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 80,
+        "drawings_count": 87205,
+        "images_count": 25,
+        "text_blocks_count": 139,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "HYBRID"
+    },
+    {
+        "page_number": 81,
+        "drawings_count": 923,
+        "images_count": 0,
+        "text_blocks_count": 60,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 82,
+        "drawings_count": 1974,
+        "images_count": 0,
+        "text_blocks_count": 121,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 83,
+        "drawings_count": 2472,
+        "images_count": 0,
+        "text_blocks_count": 148,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 84,
+        "drawings_count": 2426,
+        "images_count": 0,
+        "text_blocks_count": 134,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 85,
+        "drawings_count": 2413,
+        "images_count": 0,
+        "text_blocks_count": 131,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 86,
+        "drawings_count": 2679,
+        "images_count": 0,
+        "text_blocks_count": 143,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 87,
+        "drawings_count": 2126,
+        "images_count": 0,
+        "text_blocks_count": 129,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 88,
+        "drawings_count": 2120,
+        "images_count": 0,
+        "text_blocks_count": 130,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 89,
+        "drawings_count": 2181,
+        "images_count": 0,
+        "text_blocks_count": 131,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 90,
+        "drawings_count": 2142,
+        "images_count": 0,
+        "text_blocks_count": 130,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 91,
+        "drawings_count": 1832,
+        "images_count": 0,
+        "text_blocks_count": 92,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 92,
+        "drawings_count": 1481,
+        "images_count": 0,
+        "text_blocks_count": 80,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 93,
+        "drawings_count": 1715,
+        "images_count": 0,
+        "text_blocks_count": 93,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 94,
+        "drawings_count": 1374,
+        "images_count": 0,
+        "text_blocks_count": 83,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 95,
+        "drawings_count": 1897,
+        "images_count": 0,
+        "text_blocks_count": 108,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 96,
+        "drawings_count": 1831,
+        "images_count": 0,
+        "text_blocks_count": 95,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 97,
+        "drawings_count": 2266,
+        "images_count": 0,
+        "text_blocks_count": 108,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 98,
+        "drawings_count": 2286,
+        "images_count": 0,
+        "text_blocks_count": 110,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 99,
+        "drawings_count": 2246,
+        "images_count": 0,
+        "text_blocks_count": 113,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 100,
+        "drawings_count": 2274,
+        "images_count": 0,
+        "text_blocks_count": 117,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 101,
+        "drawings_count": 2330,
+        "images_count": 0,
+        "text_blocks_count": 120,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 102,
+        "drawings_count": 2284,
+        "images_count": 0,
+        "text_blocks_count": 122,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 103,
+        "drawings_count": 2274,
+        "images_count": 0,
+        "text_blocks_count": 122,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 104,
+        "drawings_count": 2290,
+        "images_count": 0,
+        "text_blocks_count": 122,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 105,
+        "drawings_count": 2142,
+        "images_count": 0,
+        "text_blocks_count": 125,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 106,
+        "drawings_count": 1841,
+        "images_count": 0,
+        "text_blocks_count": 99,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 107,
+        "drawings_count": 1041,
+        "images_count": 0,
+        "text_blocks_count": 65,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 108,
+        "drawings_count": 3774,
+        "images_count": 0,
+        "text_blocks_count": 181,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 109,
+        "drawings_count": 12436,
+        "images_count": 0,
+        "text_blocks_count": 149,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 110,
+        "drawings_count": 12223,
+        "images_count": 0,
+        "text_blocks_count": 179,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 111,
+        "drawings_count": 7026,
+        "images_count": 0,
+        "text_blocks_count": 104,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 112,
+        "drawings_count": 17893,
+        "images_count": 0,
+        "text_blocks_count": 118,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 113,
+        "drawings_count": 9201,
+        "images_count": 0,
+        "text_blocks_count": 106,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 114,
+        "drawings_count": 47409,
+        "images_count": 0,
+        "text_blocks_count": 95,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 115,
+        "drawings_count": 32064,
+        "images_count": 0,
+        "text_blocks_count": 92,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 116,
+        "drawings_count": 7306,
+        "images_count": 0,
+        "text_blocks_count": 87,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 117,
+        "drawings_count": 10551,
+        "images_count": 0,
+        "text_blocks_count": 92,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 118,
+        "drawings_count": 8256,
+        "images_count": 0,
+        "text_blocks_count": 103,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 119,
+        "drawings_count": 7333,
+        "images_count": 0,
+        "text_blocks_count": 131,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 120,
+        "drawings_count": 3104,
+        "images_count": 0,
+        "text_blocks_count": 100,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 121,
+        "drawings_count": 11563,
+        "images_count": 0,
+        "text_blocks_count": 97,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 122,
+        "drawings_count": 3047,
+        "images_count": 0,
+        "text_blocks_count": 102,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 123,
+        "drawings_count": 43924,
+        "images_count": 0,
+        "text_blocks_count": 81,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 124,
+        "drawings_count": 28363,
+        "images_count": 0,
+        "text_blocks_count": 88,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 125,
+        "drawings_count": 4889,
+        "images_count": 0,
+        "text_blocks_count": 70,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 126,
+        "drawings_count": 8168,
+        "images_count": 0,
+        "text_blocks_count": 68,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 127,
+        "drawings_count": 4183,
+        "images_count": 0,
+        "text_blocks_count": 160,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 128,
+        "drawings_count": 6273,
+        "images_count": 0,
+        "text_blocks_count": 115,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 129,
+        "drawings_count": 2010,
+        "images_count": 0,
+        "text_blocks_count": 71,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 130,
+        "drawings_count": 3144,
+        "images_count": 0,
+        "text_blocks_count": 141,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 131,
+        "drawings_count": 2739,
+        "images_count": 0,
+        "text_blocks_count": 132,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 132,
+        "drawings_count": 3998,
+        "images_count": 0,
+        "text_blocks_count": 131,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 133,
+        "drawings_count": 3162,
+        "images_count": 0,
+        "text_blocks_count": 113,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 134,
+        "drawings_count": 4731,
+        "images_count": 0,
+        "text_blocks_count": 204,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 135,
+        "drawings_count": 4904,
+        "images_count": 0,
+        "text_blocks_count": 133,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 136,
+        "drawings_count": 4906,
+        "images_count": 0,
+        "text_blocks_count": 130,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 137,
+        "drawings_count": 4841,
+        "images_count": 0,
+        "text_blocks_count": 181,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 138,
+        "drawings_count": 5088,
+        "images_count": 0,
+        "text_blocks_count": 134,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 139,
+        "drawings_count": 4927,
+        "images_count": 0,
+        "text_blocks_count": 183,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 140,
+        "drawings_count": 2393,
+        "images_count": 0,
+        "text_blocks_count": 183,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 141,
+        "drawings_count": 3549,
+        "images_count": 0,
+        "text_blocks_count": 139,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 142,
+        "drawings_count": 3910,
+        "images_count": 0,
+        "text_blocks_count": 202,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 143,
+        "drawings_count": 3530,
+        "images_count": 0,
+        "text_blocks_count": 190,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 144,
+        "drawings_count": 1809,
+        "images_count": 0,
+        "text_blocks_count": 105,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 145,
+        "drawings_count": 1935,
+        "images_count": 0,
+        "text_blocks_count": 159,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 146,
+        "drawings_count": 2029,
+        "images_count": 0,
+        "text_blocks_count": 114,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 147,
+        "drawings_count": 1447,
+        "images_count": 0,
+        "text_blocks_count": 93,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 148,
+        "drawings_count": 2017,
+        "images_count": 0,
+        "text_blocks_count": 119,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 149,
+        "drawings_count": 24451,
+        "images_count": 4,
+        "text_blocks_count": 267,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "HYBRID"
+    },
+    {
+        "page_number": 150,
+        "drawings_count": 10283,
+        "images_count": 6,
+        "text_blocks_count": 179,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "HYBRID"
+    },
+    {
+        "page_number": 151,
+        "drawings_count": 6750,
+        "images_count": 21,
+        "text_blocks_count": 123,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "HYBRID"
+    },
+    {
+        "page_number": 152,
+        "drawings_count": 294,
+        "images_count": 46,
+        "text_blocks_count": 31,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "HYBRID"
+    },
+    {
+        "page_number": 153,
+        "drawings_count": 9806,
+        "images_count": 1,
+        "text_blocks_count": 1,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "HYBRID"
+    },
+    {
+        "page_number": 154,
+        "drawings_count": 10725,
+        "images_count": 1,
+        "text_blocks_count": 1,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "HYBRID"
+    },
+    {
+        "page_number": 155,
+        "drawings_count": 12000,
+        "images_count": 1,
+        "text_blocks_count": 1,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "HYBRID"
+    },
+    {
+        "page_number": 156,
+        "drawings_count": 9712,
+        "images_count": 1,
+        "text_blocks_count": 1,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "HYBRID"
+    },
+    {
+        "page_number": 157,
+        "drawings_count": 10462,
+        "images_count": 1,
+        "text_blocks_count": 1,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "HYBRID"
+    },
+    {
+        "page_number": 158,
+        "drawings_count": 11616,
+        "images_count": 1,
+        "text_blocks_count": 1,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "HYBRID"
+    },
+    {
+        "page_number": 159,
+        "drawings_count": 6607,
+        "images_count": 1,
+        "text_blocks_count": 1,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "HYBRID"
+    },
+    {
+        "page_number": 160,
+        "drawings_count": 7194,
+        "images_count": 6,
+        "text_blocks_count": 148,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "HYBRID"
+    },
+    {
+        "page_number": 161,
+        "drawings_count": 2841,
+        "images_count": 0,
+        "text_blocks_count": 138,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 162,
+        "drawings_count": 8133,
+        "images_count": 0,
+        "text_blocks_count": 162,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 163,
+        "drawings_count": 1527,
+        "images_count": 0,
+        "text_blocks_count": 87,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 164,
+        "drawings_count": 8003,
+        "images_count": 0,
+        "text_blocks_count": 95,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 165,
+        "drawings_count": 6585,
+        "images_count": 0,
+        "text_blocks_count": 98,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 166,
+        "drawings_count": 1682,
+        "images_count": 0,
+        "text_blocks_count": 87,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 167,
+        "drawings_count": 11550,
+        "images_count": 0,
+        "text_blocks_count": 124,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 168,
+        "drawings_count": 2134,
+        "images_count": 0,
+        "text_blocks_count": 82,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 169,
+        "drawings_count": 43226,
+        "images_count": 0,
+        "text_blocks_count": 81,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 170,
+        "drawings_count": 27829,
+        "images_count": 0,
+        "text_blocks_count": 91,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 171,
+        "drawings_count": 4846,
+        "images_count": 0,
+        "text_blocks_count": 84,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 172,
+        "drawings_count": 8176,
+        "images_count": 0,
+        "text_blocks_count": 73,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 173,
+        "drawings_count": 8676,
+        "images_count": 0,
+        "text_blocks_count": 87,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 174,
+        "drawings_count": 3707,
+        "images_count": 0,
+        "text_blocks_count": 88,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 175,
+        "drawings_count": 3109,
+        "images_count": 0,
+        "text_blocks_count": 80,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 176,
+        "drawings_count": 13246,
+        "images_count": 0,
+        "text_blocks_count": 92,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 177,
+        "drawings_count": 5123,
+        "images_count": 0,
+        "text_blocks_count": 77,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 178,
+        "drawings_count": 43805,
+        "images_count": 0,
+        "text_blocks_count": 74,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 179,
+        "drawings_count": 28605,
+        "images_count": 0,
+        "text_blocks_count": 78,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 180,
+        "drawings_count": 4717,
+        "images_count": 0,
+        "text_blocks_count": 63,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 181,
+        "drawings_count": 976,
+        "images_count": 0,
+        "text_blocks_count": 55,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 182,
+        "drawings_count": 8579,
+        "images_count": 0,
+        "text_blocks_count": 92,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 183,
+        "drawings_count": 3509,
+        "images_count": 0,
+        "text_blocks_count": 98,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 184,
+        "drawings_count": 6071,
+        "images_count": 0,
+        "text_blocks_count": 79,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 185,
+        "drawings_count": 14639,
+        "images_count": 0,
+        "text_blocks_count": 92,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 186,
+        "drawings_count": 8836,
+        "images_count": 0,
+        "text_blocks_count": 77,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 187,
+        "drawings_count": 49333,
+        "images_count": 0,
+        "text_blocks_count": 81,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 188,
+        "drawings_count": 30549,
+        "images_count": 0,
+        "text_blocks_count": 86,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 189,
+        "drawings_count": 1017,
+        "images_count": 0,
+        "text_blocks_count": 63,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 190,
+        "drawings_count": 977,
+        "images_count": 0,
+        "text_blocks_count": 55,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 191,
+        "drawings_count": 9744,
+        "images_count": 20,
+        "text_blocks_count": 106,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "HYBRID"
+    },
+    {
+        "page_number": 192,
+        "drawings_count": 4605,
+        "images_count": 1,
+        "text_blocks_count": 222,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "HYBRID"
+    },
+    {
+        "page_number": 193,
+        "drawings_count": 2137,
+        "images_count": 0,
+        "text_blocks_count": 81,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 194,
+        "drawings_count": 4606,
+        "images_count": 0,
+        "text_blocks_count": 155,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 195,
+        "drawings_count": 6067,
+        "images_count": 0,
+        "text_blocks_count": 62,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 196,
+        "drawings_count": 5017,
+        "images_count": 0,
+        "text_blocks_count": 161,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 197,
+        "drawings_count": 5489,
+        "images_count": 0,
+        "text_blocks_count": 67,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 198,
+        "drawings_count": 4823,
+        "images_count": 0,
+        "text_blocks_count": 93,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 199,
+        "drawings_count": 15858,
+        "images_count": 0,
+        "text_blocks_count": 134,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 200,
+        "drawings_count": 7359,
+        "images_count": 0,
+        "text_blocks_count": 105,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 201,
+        "drawings_count": 45894,
+        "images_count": 0,
+        "text_blocks_count": 116,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 202,
+        "drawings_count": 30545,
+        "images_count": 0,
+        "text_blocks_count": 115,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 203,
+        "drawings_count": 2498,
+        "images_count": 0,
+        "text_blocks_count": 104,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    },
+    {
+        "page_number": 204,
+        "drawings_count": 2085,
+        "images_count": 0,
+        "text_blocks_count": 104,
+        "page_width": 1224.0,
+        "page_height": 792.0,
+        "classification": "VECTOR"
+    }
+]

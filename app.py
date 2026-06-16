@@ -1,40 +1,34 @@
 """
-Streamlit app for highway cross-section earthwork analysis.
-Upload a PDF or images, select a cross-section, and detect Cut/Fill zones.
+Streamlit app — Direct PDF Vector Extraction pipeline.
+Upload a highway PDF → classify pages → extract profiles → compute cut/fill volumes.
 """
 
 import streamlit as st
 import os
 import tempfile
 import shutil
-import cv2
 import pandas as pd
-from io import BytesIO
 from PIL import Image
 
-from pipeline import (
-    extract_scale_report,
-    extract_cross_section_images,
-    fill_earthwork_zones,
-)
+from orchestrator import VectorPipeline
+from pdf_classifier import PDFClassifier
 
 
-# -- Page setup --
+# ── Page config ───────────────────────────────────────────────────────────────
 
 st.set_page_config(
-    page_title="XDOT Contractor — Road Analyzer",
+    page_title="XDOT Contractor — Road Quantity Analyzer",
     page_icon="🛣️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 
-# -- Styling --
+# ── Theme ─────────────────────────────────────────────────────────────────────
 
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-
 .stApp { font-family: 'Inter', sans-serif; }
 
 .main-header {
@@ -74,12 +68,28 @@ st.markdown("""
 .stat-box .stat-value { color: #f8fafc; font-size: 2rem; font-weight: 800; }
 .stat-box .stat-label { color: #94a3b8; font-size: .8rem; text-transform: uppercase; letter-spacing: .5px; margin-top: .25rem; }
 
-.legend-container { display: flex; gap: 1.5rem; margin: 1rem 0; }
+.vol-card {
+    background: linear-gradient(145deg,#1e293b,#0f172a);
+    border: 1px solid rgba(99,102,241,0.15); border-radius: 12px;
+    padding: 1.5rem; text-align: center;
+}
+.vol-card.cut  { border-color: rgba(239,68,68,0.4); }
+.vol-card.fill { border-color: rgba(34,197,94,0.4); }
+.vol-card.net  { border-color: rgba(99,102,241,0.4); }
+.vol-card .vol-value { font-size: 1.8rem; font-weight: 800; }
+.vol-card .vol-unit  { font-size: .85rem; color: #94a3b8; }
+.vol-card .vol-label { font-size: .75rem; color: #64748b; text-transform: uppercase; letter-spacing: .5px; margin-top: .25rem; }
+.vol-card.cut  .vol-value { color: #ef4444; }
+.vol-card.fill .vol-value { color: #22c55e; }
+.vol-card.net  .vol-value { color: #818cf8; }
+
+.legend-container { display: flex; gap: 1.5rem; margin: 1rem 0; flex-wrap: wrap; }
 .legend-item { display: flex; align-items: center; gap: .5rem; color: #cbd5e1; font-size: .88rem; font-weight: 500; }
 .legend-dot { width: 14px; height: 14px; border-radius: 4px; }
 .legend-dot.red   { background: #ef4444; }
 .legend-dot.green { background: #22c55e; }
 .legend-dot.blue  { background: #3b82f6; }
+.legend-dot.gray  { background: #64748b; }
 
 section[data-testid="stSidebar"] { background: linear-gradient(180deg,#0f172a,#1e293b) !important; }
 
@@ -101,23 +111,17 @@ section[data-testid="stSidebar"] { background: linear-gradient(180deg,#0f172a,#1
     border: 2px dashed rgba(99,102,241,0.3) !important; border-radius: 12px !important;
     padding: 2rem !important; background: rgba(99,102,241,0.03) !important;
 }
-
 .stProgress > div > div { background: linear-gradient(90deg,#6366f1,#8b5cf6) !important; border-radius: 8px !important; }
 hr { border-color: rgba(99,102,241,0.1) !important; margin: 1.5rem 0 !important; }
 </style>
 """, unsafe_allow_html=True)
 
 
-# -- Session state --
+# ── State ─────────────────────────────────────────────────────────────────────
 
 for key, default in {
-    "upload_mode": None,
-    "pdf_path": None,
-    "pdf_name": None,
-    "scale_report": None,
-    "images": None,
-    "processed_results": None,
-    "work_dir": None,
+    "pdf_path": None, "pdf_name": None, "doc_analysis": None,
+    "selected_pages": [], "pipeline_result": None, "work_dir": None,
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
@@ -125,20 +129,25 @@ for key, default in {
 
 def get_work_dir():
     if st.session_state.work_dir is None:
-        st.session_state.work_dir = tempfile.mkdtemp(prefix="xdot_")
+        st.session_state.work_dir = tempfile.mkdtemp(prefix="xdot_vec_")
     return st.session_state.work_dir
 
 
-# -- Sidebar --
+# ── Sidebar ───────────────────────────────────────────────────────────────────
 
 with st.sidebar:
-    st.markdown("## 🛣️ Pipeline Steps")
+    st.markdown("## 🛣️ Vector Pipeline")
 
     steps = [
-        ("1", "Upload & Extract", "Upload a PDF or images",
-         st.session_state.images is not None),
-        ("2", "Process All", "Detect Cut/Fill for all images",
-         st.session_state.processed_results is not None),
+        ("1", "Upload & Classify", "Upload PDF, analyze structure",
+         st.session_state.doc_analysis is not None),
+        ("2", "Select Pages", "Choose pages to process",
+         len(st.session_state.selected_pages) > 0),
+        ("3", "Run Pipeline", "Extract profiles, compute volumes",
+         st.session_state.pipeline_result is not None),
+        ("4", "Results", "View volumes, plots, reports",
+         st.session_state.pipeline_result is not None
+         and len(getattr(st.session_state.pipeline_result, "successful_pages", [])) > 0),
     ]
     for num, title, desc, done in steps:
         cls = "step-card step-done" if done else "step-card"
@@ -152,15 +161,21 @@ with st.sidebar:
 
     st.divider()
 
-    # Show scale report if we extracted from a PDF
-    if st.session_state.scale_report:
-        with st.expander("📐 Scale Report", expanded=False):
-            df = pd.DataFrame(st.session_state.scale_report)
-            df.columns = ["Page #", "H-Scale", "V-Scale"]
-            st.dataframe(df, width='stretch', hide_index=True)
-        st.divider()
+    if st.session_state.doc_analysis:
+        da = st.session_state.doc_analysis
+        with st.expander("📊 Page Classification", expanded=False):
+            st.markdown(f"""
+            | Type | Count |
+            |------|-------|
+            | 🟢 Vector | **{len(da.vector_pages)}** |
+            | 🟡 Hybrid | **{len(da.hybrid_pages)}** |
+            | 🔴 Raster | **{len(da.raster_pages)}** |
+            | 📐 Cross-Section | **{len(da.cross_section_pages)}** |
+            """)
 
-    if st.button("🔄 Reset Pipeline", width='stretch'):
+    st.divider()
+
+    if st.button("🔄 Reset Pipeline", use_container_width=True):
         if st.session_state.work_dir and os.path.exists(st.session_state.work_dir):
             shutil.rmtree(st.session_state.work_dir, ignore_errors=True)
         for k in list(st.session_state.keys()):
@@ -168,262 +183,283 @@ with st.sidebar:
         st.rerun()
 
 
-# -- Header --
+# ── Header ────────────────────────────────────────────────────────────────────
 
 st.markdown("""
 <div class="main-header">
-    <div class="badge">PHASE 1 — RPA-DRIVEN AUTOMATED ESTIMATING</div>
+    <div class="badge">APPROACH 2 — DIRECT PDF VECTOR EXTRACTION</div>
     <h1>🛣️ Road Quantity Analyzer</h1>
-    <p>Upload highway planning PDFs or cross-section images to detect and visualize Cut & Fill zones.</p>
+    <p>Extract profile geometry from CAD-generated PDFs and compute earthwork cut/fill volumes.</p>
 </div>""", unsafe_allow_html=True)
 
 
-# ===========================
-# STEP 1 — Upload
-# ===========================
+# ══════════════════════════════════════════════════════════════════════════════
+# STEP 1 — Upload & Classify
+# ══════════════════════════════════════════════════════════════════════════════
 
-st.markdown("### Step 1 — Upload")
+st.markdown("### Step 1 — Upload & Classify PDF")
 
-tab_pdf, tab_images = st.tabs(["📑 Upload PDF", "🖼️ Upload Images"])
+pdf_file = st.file_uploader("Select a highway engineering PDF", type=["pdf"], key="pdf_uploader")
 
-with tab_pdf:
-    st.markdown("Upload a highway planning PDF — the app will extract cross-section images from it.")
+if pdf_file is not None:
+    if st.session_state.pdf_name != pdf_file.name:
+        path = os.path.join(get_work_dir(), pdf_file.name)
+        with open(path, "wb") as f:
+            f.write(pdf_file.getbuffer())
+        st.session_state.update(
+            pdf_path=path, pdf_name=pdf_file.name,
+            doc_analysis=None, selected_pages=[], pipeline_result=None,
+        )
 
-    pdf_file = st.file_uploader("Select a PDF file", type=["pdf"], key="pdf_uploader")
-
-    if pdf_file is not None:
-        is_new = st.session_state.pdf_name != pdf_file.name or st.session_state.upload_mode != "pdf"
-
-        if is_new:
-            path = os.path.join(get_work_dir(), pdf_file.name)
-            with open(path, "wb") as f:
-                f.write(pdf_file.getbuffer())
-            st.session_state.update(
-                pdf_path=path, pdf_name=pdf_file.name, upload_mode="pdf",
-                images=None, processed_results=None, scale_report=None,
-            )
-
-        if st.session_state.upload_mode == "pdf" and st.session_state.images is None:
-            st.success(f"✅ **{pdf_file.name}** ready.")
-            if st.button("🚀 Extract Cross-Sections", key="btn_extract", width='stretch'):
-                out_dir = os.path.join(get_work_dir(), "extracted")
-                os.makedirs(out_dir, exist_ok=True)
-
-                with st.spinner("Analyzing PDF..."):
-                    st.session_state.scale_report = extract_scale_report(st.session_state.pdf_path)
-
-                bar = st.progress(0, text="Extracting images...")
-                raw = extract_cross_section_images(
-                    st.session_state.pdf_path, out_dir, zoom=4.0,
-                    progress_callback=lambda cur, tot: bar.progress(cur / tot, f"Page {cur}/{tot}..."),
-                )
-                bar.progress(1.0, "Done!")
-
-                st.session_state.images = [
-                    {"path": r["path"], "name": os.path.basename(r["path"]),
-                     "page": r["page"], "station": r["station"]}
-                    for r in raw
-                ]
-                st.session_state.processed_results = None
-                st.rerun()
-
-        elif st.session_state.upload_mode == "pdf" and st.session_state.images is not None:
-            st.success(f"✅ Extracted **{len(st.session_state.images)}** images from **{st.session_state.pdf_name}**")
-
-
-with tab_images:
-    st.markdown("Upload cross-section images directly (PNG, JPG).")
-
-    img_files = st.file_uploader(
-        "Select images", type=["png", "jpg", "jpeg"],
-        accept_multiple_files=True, key="img_uploader",
-    )
-
-    if img_files:
-        new_names = sorted(f.name for f in img_files)
-        old_names = sorted(img["name"] for img in st.session_state.images) if (
-            st.session_state.images and st.session_state.upload_mode == "images"
-        ) else []
-
-        if new_names != old_names or st.session_state.upload_mode != "images":
-            img_dir = os.path.join(get_work_dir(), "uploaded_images")
-            os.makedirs(img_dir, exist_ok=True)
-
-            items = []
-            for uf in img_files:
-                p = os.path.join(img_dir, uf.name)
-                with open(p, "wb") as f:
-                    f.write(uf.getbuffer())
-                items.append({
-                    "path": p, "name": uf.name,
-                    "page": None, "station": os.path.splitext(uf.name)[0],
-                })
-
-            st.session_state.update(
-                upload_mode="images", images=items,
-                pdf_path=None, pdf_name=None, scale_report=None,
-                processed_results=None,
-            )
+    if st.session_state.doc_analysis is None:
+        st.success(f"✅ **{pdf_file.name}** uploaded.")
+        if st.button("🔍 Analyze PDF Structure", key="btn_classify", use_container_width=True):
+            with st.spinner("Analyzing PDF pages..."):
+                classifier = PDFClassifier(st.session_state.pdf_path)
+                st.session_state.doc_analysis = classifier.analyze()
             st.rerun()
+    else:
+        da = st.session_state.doc_analysis
+        st.success(f"✅ **{da.total_pages}** pages analyzed in **{st.session_state.pdf_name}**")
 
-        if st.session_state.upload_mode == "images" and st.session_state.images:
-            st.success(f"✅ **{len(st.session_state.images)}** image(s) uploaded.")
+        with st.expander("📋 Full Page Classification Table", expanded=False):
+            classifier = PDFClassifier(st.session_state.pdf_path)
+            st.dataframe(pd.DataFrame(classifier.to_dict_list(da)),
+                         use_container_width=True, hide_index=True)
+
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            st.markdown(f'<div class="stat-box"><div class="stat-value">{da.total_pages}</div>'
+                        '<div class="stat-label">Total Pages</div></div>', unsafe_allow_html=True)
+        with c2:
+            st.markdown(f'<div class="stat-box"><div class="stat-value">{len(da.vector_pages)}</div>'
+                        '<div class="stat-label">Vector Pages</div></div>', unsafe_allow_html=True)
+        with c3:
+            st.markdown(f'<div class="stat-box"><div class="stat-value">{len(da.cross_section_pages)}</div>'
+                        '<div class="stat-label">Cross-Sections</div></div>', unsafe_allow_html=True)
+        with c4:
+            st.markdown(f'<div class="stat-box"><div class="stat-value">{len(da.processable_pages)}</div>'
+                        '<div class="stat-label">Processable</div></div>', unsafe_allow_html=True)
 
 st.divider()
 
 
-# ===========================
-# STEP 2 — Process All Images
-# ===========================
+# ══════════════════════════════════════════════════════════════════════════════
+# STEP 2 — Select Pages
+# ══════════════════════════════════════════════════════════════════════════════
 
-st.markdown("### Step 2 — Process All Images")
+st.markdown("### Step 2 — Select Pages to Process")
+
+if not st.session_state.doc_analysis:
+    st.info("Upload and analyze a PDF in Step 1.")
+else:
+    da = st.session_state.doc_analysis
+    processable = da.processable_pages
+
+    if not processable:
+        st.warning("No processable cross-section pages found.")
+        all_vec = [p for p in da.pages if p.classification in ("VECTOR", "HYBRID")]
+        if all_vec:
+            st.info(f"Found {len(all_vec)} vector/hybrid pages — select manually:")
+            selected = st.multiselect("Select pages", [p.page_number for p in all_vec],
+                                      default=[], key="manual_page_select")
+            if selected:
+                st.session_state.selected_pages = selected
+    else:
+        st.markdown(f"**{len(processable)}** pages ready for vector extraction.")
+        page_nums = [p.page_number for p in processable]
+
+        col_a, col_b = st.columns([3, 1])
+        with col_a:
+            selected = st.multiselect("Select pages (all by default)", page_nums,
+                                      default=page_nums, key="page_select")
+            st.session_state.selected_pages = selected
+        with col_b:
+            st.markdown("")
+            st.markdown("")
+            if st.button("Select All", key="btn_all"):
+                st.session_state.selected_pages = page_nums
+                st.rerun()
+
+        with st.expander("⚙️ Scale Overrides (optional)", expanded=False):
+            st.markdown("Leave at **0** to auto-detect from PDF text.")
+            sc1, sc2 = st.columns(2)
+            with sc1:
+                h_over = st.number_input("Horizontal Scale (ft/inch)", min_value=0.0,
+                                         value=0.0, step=1.0, key="h_scale_override")
+            with sc2:
+                v_over = st.number_input("Vertical Scale (ft/inch)", min_value=0.0,
+                                         value=0.0, step=1.0, key="v_scale_override")
+
+st.divider()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# STEP 3 — Run Pipeline
+# ══════════════════════════════════════════════════════════════════════════════
+
+st.markdown("### Step 3 — Run Vector Pipeline")
 
 st.markdown("""
 <div class="legend-container">
-    <div class="legend-item"><span class="legend-dot red"></span>Cut Zone (Excavation)</div>
-    <div class="legend-item"><span class="legend-dot green"></span>Fill Zone (Embankment)</div>
-    <div class="legend-item"><span class="legend-dot blue"></span>Design Profile Line</div>
+    <div class="legend-item"><span class="legend-dot red"></span>Cut (Excavation)</div>
+    <div class="legend-item"><span class="legend-dot green"></span>Fill (Embankment)</div>
+    <div class="legend-item"><span class="legend-dot blue"></span>Proposed Grade</div>
+    <div class="legend-item"><span class="legend-dot gray"></span>Existing Ground</div>
 </div>""", unsafe_allow_html=True)
 
-if not st.session_state.images:
-    st.info("Upload a PDF or images in Step 1.")
+if not st.session_state.selected_pages:
+    st.info("Select pages in Step 2.")
+elif st.session_state.pipeline_result is None:
+    pages = st.session_state.selected_pages
+    st.markdown(f"Ready to process **{len(pages)}** page(s).")
+
+    with st.expander("⚙️ Pipeline Settings", expanded=False):
+        s1, s2 = st.columns(2)
+        with s1:
+            interval = st.number_input("Station Interval (ft)", min_value=0.1,
+                                       value=1.0, step=0.5, key="station_interval")
+        with s2:
+            method = st.selectbox("Interpolation", ["linear", "cubic"], index=0, key="interp_method")
+
+    if st.button(f"🚀 Run Pipeline on {len(pages)} Page(s)", key="btn_run", use_container_width=True):
+        report_dir = os.path.join(get_work_dir(), "reports")
+        os.makedirs(report_dir, exist_ok=True)
+
+        h_s = st.session_state.get("h_scale_override", 0.0)
+        v_s = st.session_state.get("v_scale_override", 0.0)
+
+        pipeline = VectorPipeline(
+            station_interval=st.session_state.get("station_interval", 1.0),
+            interpolation_method=st.session_state.get("interp_method", "linear"),
+            output_dir=report_dir,
+        )
+
+        bar = st.progress(0, text="Starting...")
+        result = pipeline.run(
+            pdf_path=st.session_state.pdf_path,
+            page_numbers=pages,
+            h_scale_override=h_s if h_s > 0 else None,
+            v_scale_override=v_s if v_s > 0 else None,
+            progress_callback=lambda c, t, m: bar.progress(c / max(t, 1), text=m),
+        )
+        bar.progress(1.0, text="Done!")
+
+        st.session_state.pipeline_result = result
+        st.rerun()
 else:
-    images = st.session_state.images
+    result = st.session_state.pipeline_result
+    ok = len(result.successful_pages)
+    fail = len(result.failed_pages)
 
-    # Stats
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown(f"""<div class="stat-box"><div class="stat-value">{len(images)}</div>
-            <div class="stat-label">Total Images</div></div>""", unsafe_allow_html=True)
-    with c2:
-        mode = "PDF Extraction" if st.session_state.upload_mode == "pdf" else "Direct Upload"
-        icon = "📑" if st.session_state.upload_mode == "pdf" else "🖼️"
-        st.markdown(f"""<div class="stat-box"><div class="stat-value">{icon}</div>
-            <div class="stat-label">{mode}</div></div>""", unsafe_allow_html=True)
+    if ok > 0:
+        st.success(f"✅ **{ok}/{len(result.page_results)}** pages processed.")
+    if fail > 0:
+        st.warning(f"⚠️ **{fail}** page(s) had errors.")
 
-    st.markdown("")
-
-    # Preview gallery of extracted images
-    with st.expander("📋 Preview Extracted Images", expanded=False):
-        cols = st.columns(min(len(images), 4))
-        for i, img in enumerate(images):
-            with cols[i % 4]:
-                try:
-                    cap = f"Sta {img['station']}" if img["page"] else img["name"]
-                    st.image(Image.open(img["path"]), caption=cap, use_container_width=True)
-                except Exception:
-                    st.error("Load error")
-
-    debug_on = st.checkbox("🔍 Save debug images (intermediate pipeline stages)", value=False, key="debug_toggle")
-
-    if st.session_state.processed_results is None:
-        if st.button(f"🚀 Process All {len(images)} Images", key="btn_process_all", use_container_width=True):
-            out_dir = os.path.join(get_work_dir(), "processed")
-            os.makedirs(out_dir, exist_ok=True)
-
-            results = []
-            bar = st.progress(0, text="Processing images...")
-
-            for idx, img_info in enumerate(images):
-                img_label = f"Page {img_info['page']} — Station {img_info['station']}" if img_info["page"] else img_info["name"]
-                bar.progress((idx) / len(images), text=f"Processing {img_label} ({idx + 1}/{len(images)})...")
-
-                gray = cv2.imread(img_info["path"], cv2.IMREAD_GRAYSCALE)
-                if gray is None:
-                    results.append({
-                        "original": img_info["path"],
-                        "processed": None,
-                        "name": img_info["name"],
-                        "label": img_label,
-                        "debug_dir": None,
-                        "error": True,
-                    })
-                    continue
-
-                # Debug dir per image (only if enabled)
-                dbg_dir = None
-                if debug_on:
-                    safe_name = os.path.splitext(img_info["name"])[0]
-                    dbg_dir = os.path.join(out_dir, "debug", safe_name)
-
-                result = fill_earthwork_zones(gray, debug_dir=dbg_dir)
-                out_path = os.path.join(out_dir, f"processed_{img_info['name']}")
-                cv2.imwrite(out_path, result)
-
-                results.append({
-                    "original": img_info["path"],
-                    "processed": out_path,
-                    "name": img_info["name"],
-                    "label": img_label,
-                    "debug_dir": dbg_dir,
-                    "error": False,
-                })
-
-            bar.progress(1.0, text="Done!")
-            st.session_state.processed_results = results
-            st.rerun()
-    else:
-        results = st.session_state.processed_results
-        success_count = sum(1 for r in results if not r.get("error"))
-        st.success(f"✅ Processed **{success_count}/{len(results)}** images successfully.")
-
-        # Show each result as an expandable section
-        for i, res in enumerate(results):
-            if res.get("error"):
-                st.error(f"❌ **{res['label']}** — Could not read image.")
-                continue
-
-            with st.expander(f"📊 {res['label']}", expanded=(i == 0)):
-                col_a, col_b = st.columns(2)
-                with col_a:
-                    st.markdown("##### Original")
-                    try:
-                        st.image(Image.open(res["original"]), use_container_width=True)
-                    except Exception:
-                        st.error("Could not load original.")
-                with col_b:
-                    st.markdown("##### Processed (Cut / Fill)")
-                    try:
-                        st.image(Image.open(res["processed"]), use_container_width=True)
-                    except Exception:
-                        st.error("Could not load result.")
-
-                st.markdown("")
-                if res["processed"] and os.path.exists(res["processed"]):
-                    with open(res["processed"], "rb") as f:
-                        st.download_button(
-                            f"⬇️ Download — {res['label']}", f.read(),
-                            file_name=f"processed_{res['name']}", mime="image/png",
-                            use_container_width=True,
-                            key=f"dl_{i}",
-                        )
-
-                # Show debug stage images if they were generated
-                dbg = res.get("debug_dir")
-                if dbg and os.path.isdir(dbg):
-                    st.markdown("---")
-                    st.markdown("**🔬 Debug: Intermediate Pipeline Stages**")
-                    debug_files = [
-                        ("1_binary.png", "Stage 1 — Binary threshold"),
-                        ("2_grid_detected.png", "Stage 2 — Grid lines detected"),
-                        ("3_after_grid_removal.png", "Stage 3 — After grid removal"),
-                        ("4_design_mask.png", "Stage 4 — Design (solid) mask"),
-                        ("5_dotted_mask.png", "Stage 5 — Ground (dotted) mask"),
-                        ("6_final.png", "Stage 6 — Final output"),
-                    ]
-                    for fname, caption in debug_files:
-                        fpath = os.path.join(dbg, fname)
-                        if os.path.exists(fpath):
-                            st.markdown(f"**{caption}**")
-                            st.image(Image.open(fpath), use_container_width=True)
-                            st.markdown("")
+st.divider()
 
 
-# -- Footer --
+# ══════════════════════════════════════════════════════════════════════════════
+# STEP 4 — Results
+# ══════════════════════════════════════════════════════════════════════════════
+
+st.markdown("### Step 4 — Results")
+
+if st.session_state.pipeline_result is None:
+    st.info("Run the pipeline in Step 3.")
+else:
+    result = st.session_state.pipeline_result
+
+    # aggregate volume cards
+    if result.successful_pages:
+        st.markdown("#### 📊 Aggregate Volumes")
+        v1, v2, v3 = st.columns(3)
+        with v1:
+            st.markdown(f'<div class="vol-card cut"><div class="vol-value">'
+                        f'{result.total_cut_volume_cy:,.1f}</div>'
+                        '<div class="vol-unit">cu yd</div>'
+                        '<div class="vol-label">Total Cut</div></div>', unsafe_allow_html=True)
+        with v2:
+            st.markdown(f'<div class="vol-card fill"><div class="vol-value">'
+                        f'{result.total_fill_volume_cy:,.1f}</div>'
+                        '<div class="vol-unit">cu yd</div>'
+                        '<div class="vol-label">Total Fill</div></div>', unsafe_allow_html=True)
+        with v3:
+            net = result.total_cut_volume_cy - result.total_fill_volume_cy
+            st.markdown(f'<div class="vol-card net"><div class="vol-value">'
+                        f'{net:,.1f}</div>'
+                        '<div class="vol-unit">cu yd</div>'
+                        '<div class="vol-label">Net (Cut − Fill)</div></div>', unsafe_allow_html=True)
+        st.markdown("")
+
+    # per-page results
+    for pr in result.page_results:
+        if pr.success:
+            with st.expander(f"📊 {pr.page_label} — ✅", expanded=(len(result.page_results) == 1)):
+                if pr.earthwork:
+                    pc1, pc2, pc3 = st.columns(3)
+                    with pc1:
+                        st.metric("Cut", f"{pr.earthwork.total_cut_volume_cy:,.2f} cu yd")
+                    with pc2:
+                        st.metric("Fill", f"{pr.earthwork.total_fill_volume_cy:,.2f} cu yd")
+                    with pc3:
+                        st.metric("Net", f"{pr.earthwork.net_volume_cy:,.2f} cu yd")
+
+                if pr.plot_path and os.path.exists(pr.plot_path):
+                    st.image(Image.open(pr.plot_path), use_container_width=True)
+
+                if pr.validation:
+                    for w in pr.validation.warnings:
+                        st.warning(f"⚠️ {w}")
+                    for e in pr.validation.errors:
+                        st.error(f"❌ {e}")
+                    if pr.validation.is_valid and not pr.validation.warnings:
+                        st.success("✅ All checks passed.")
+
+                if pr.earthwork:
+                    with st.expander("📋 Station Data"):
+                        st.dataframe(pr.earthwork.to_dataframe(), use_container_width=True, hide_index=True)
+                    with st.expander("📋 Segment Volumes"):
+                        st.dataframe(pr.earthwork.to_volume_dataframe(), use_container_width=True, hide_index=True)
+
+                # downloads
+                dl1, dl2, dl3 = st.columns(3)
+                for col, path, label, mime, key_suffix in [
+                    (dl1, pr.csv_report_path, "⬇️ CSV", "text/csv", "csv"),
+                    (dl2, pr.json_report_path, "⬇️ JSON", "application/json", "json"),
+                    (dl3, pr.plot_path, "⬇️ Plot", "image/png", "plot"),
+                ]:
+                    if path and os.path.exists(path):
+                        with col:
+                            with open(path, "rb") as f:
+                                st.download_button(label, f.read(), os.path.basename(path),
+                                                   mime, use_container_width=True,
+                                                   key=f"dl_{key_suffix}_{pr.page_number}")
+
+                with st.expander("🔧 Diagnostics"):
+                    diag = {"classification": pr.classification, "workflow": pr.workflow,
+                            "stage": pr.stage_reached}
+                    if pr.scale:
+                        diag["h_scale"] = f"{pr.scale.h_scale} ft/in"
+                        diag["v_scale"] = f"{pr.scale.v_scale} ft/in"
+                        diag["origin"] = (pr.scale.origin_x, pr.scale.origin_y)
+                        diag["start_station"] = pr.scale.start_station
+                        diag["base_elevation"] = pr.scale.base_elevation
+                    if pr.profiles and pr.profiles.diagnostics:
+                        diag.update(pr.profiles.diagnostics)
+                    if pr.earthwork and pr.earthwork.diagnostics:
+                        diag["earthwork"] = pr.earthwork.diagnostics
+                    st.json(diag)
+
+        else:
+            with st.expander(f"❌ {pr.page_label} — Failed [{pr.stage_reached}]"):
+                st.error(pr.error)
+
+
+# ── Footer ────────────────────────────────────────────────────────────────────
 
 st.markdown("---")
-st.markdown(
-    "<p style='text-align:center; color:#64748b; font-size:.8rem;'>"
-    "XDOT Contractor — Phase 1: RPA-Driven Automated Estimating</p>",
-    unsafe_allow_html=True,
-)
+st.markdown("<p style='text-align:center; color:#64748b; font-size:.8rem;'>"
+            "XDOT Contractor — Approach 2: Direct PDF Vector Extraction</p>",
+            unsafe_allow_html=True)

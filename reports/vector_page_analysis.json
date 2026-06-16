@@ -1,0 +1,639 @@
+{
+    "page": 41,
+    "type_summary": {
+        "s": 45306,
+        "f": 5496
+    },
+    "top_candidates": [
+        {
+            "drawing_id": 842,
+            "type": "f",
+            "point_count": 63,
+            "bbox_width": 4.8,
+            "bbox_height": 13.8,
+            "stroke_width": null,
+            "color": null
+        },
+        {
+            "drawing_id": 1626,
+            "type": "f",
+            "point_count": 60,
+            "bbox_width": 4.6,
+            "bbox_height": 13.8,
+            "stroke_width": null,
+            "color": null
+        },
+        {
+            "drawing_id": 1623,
+            "type": "f",
+            "point_count": 59,
+            "bbox_width": 4.6,
+            "bbox_height": 13.8,
+            "stroke_width": null,
+            "color": null
+        },
+        {
+            "drawing_id": 1624,
+            "type": "f",
+            "point_count": 59,
+            "bbox_width": 4.6,
+            "bbox_height": 13.8,
+            "stroke_width": null,
+            "color": null
+        },
+        {
+            "drawing_id": 1625,
+            "type": "f",
+            "point_count": 59,
+            "bbox_width": 4.6,
+            "bbox_height": 13.8,
+            "stroke_width": null,
+            "color": null
+        },
+        {
+            "drawing_id": 1691,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 5.4,
+            "bbox_height": 3.0,
+            "stroke_width": 0.8399999737739563,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 1708,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 5.4,
+            "bbox_height": 3.0,
+            "stroke_width": 0.8399999737739563,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 1727,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 5.4,
+            "bbox_height": 2.9,
+            "stroke_width": 0.8399999737739563,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 1729,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 5.4,
+            "bbox_height": 2.9,
+            "stroke_width": 0.8399999737739563,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 1744,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 5.4,
+            "bbox_height": 2.9,
+            "stroke_width": 0.8399999737739563,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 1745,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 5.4,
+            "bbox_height": 2.9,
+            "stroke_width": 0.8399999737739563,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 1746,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 5.4,
+            "bbox_height": 2.9,
+            "stroke_width": 0.8399999737739563,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 1974,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 5.4,
+            "bbox_height": 3.0,
+            "stroke_width": 1.0800000429153442,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 1984,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 5.4,
+            "bbox_height": 3.0,
+            "stroke_width": 1.0800000429153442,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 1989,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 5.4,
+            "bbox_height": 3.0,
+            "stroke_width": 1.0800000429153442,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 2002,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 5.4,
+            "bbox_height": 3.0,
+            "stroke_width": 0.8399999737739563,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 2017,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 5.4,
+            "bbox_height": 3.0,
+            "stroke_width": 0.8399999737739563,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 2020,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 5.4,
+            "bbox_height": 3.0,
+            "stroke_width": 0.8399999737739563,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 1689,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 5.3,
+            "bbox_height": 3.0,
+            "stroke_width": 0.8399999737739563,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 1692,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 5.3,
+            "bbox_height": 2.9,
+            "stroke_width": 0.8399999737739563,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 1706,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 5.3,
+            "bbox_height": 3.0,
+            "stroke_width": 0.8399999737739563,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 1726,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 5.3,
+            "bbox_height": 2.9,
+            "stroke_width": 0.8399999737739563,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 1973,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 5.3,
+            "bbox_height": 2.9,
+            "stroke_width": 1.0800000429153442,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 1978,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 5.3,
+            "bbox_height": 3.0,
+            "stroke_width": 1.0800000429153442,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 1979,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 5.3,
+            "bbox_height": 3.0,
+            "stroke_width": 1.0800000429153442,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 1981,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 5.3,
+            "bbox_height": 3.1,
+            "stroke_width": 1.0800000429153442,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 1983,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 5.3,
+            "bbox_height": 3.1,
+            "stroke_width": 1.0800000429153442,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 1988,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 5.3,
+            "bbox_height": 3.0,
+            "stroke_width": 1.0800000429153442,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 1993,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 5.3,
+            "bbox_height": 3.0,
+            "stroke_width": 1.0800000429153442,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 1994,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 5.3,
+            "bbox_height": 3.0,
+            "stroke_width": 1.0800000429153442,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 2005,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 5.3,
+            "bbox_height": 3.0,
+            "stroke_width": 0.8399999737739563,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 819,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 4.2,
+            "bbox_height": 7.7,
+            "stroke_width": 1.559999942779541,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 828,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 4.1,
+            "bbox_height": 7.7,
+            "stroke_width": 1.559999942779541,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 1665,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 4.1,
+            "bbox_height": 7.7,
+            "stroke_width": 0.6000000238418579,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 1628,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 3.5,
+            "bbox_height": 4.9,
+            "stroke_width": 0.8399999737739563,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 1640,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 3.5,
+            "bbox_height": 4.9,
+            "stroke_width": 0.8399999737739563,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 1644,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 3.5,
+            "bbox_height": 4.9,
+            "stroke_width": 0.8399999737739563,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 1642,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 3.4,
+            "bbox_height": 4.9,
+            "stroke_width": 0.8399999737739563,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 852,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 2.9,
+            "bbox_height": 5.4,
+            "stroke_width": 0.6000000238418579,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 870,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 2.9,
+            "bbox_height": 5.4,
+            "stroke_width": 0.6000000238418579,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 2101,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 2.9,
+            "bbox_height": 5.4,
+            "stroke_width": 0.6000000238418579,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 2146,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 2.9,
+            "bbox_height": 5.4,
+            "stroke_width": 0.6000000238418579,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 8480,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 2.9,
+            "bbox_height": 5.4,
+            "stroke_width": 0.6000000238418579,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 8485,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 2.9,
+            "bbox_height": 5.4,
+            "stroke_width": 0.6000000238418579,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 8515,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 2.9,
+            "bbox_height": 5.4,
+            "stroke_width": 0.6000000238418579,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 8517,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 2.9,
+            "bbox_height": 5.4,
+            "stroke_width": 0.6000000238418579,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 8520,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 2.9,
+            "bbox_height": 5.4,
+            "stroke_width": 0.6000000238418579,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 8631,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 2.9,
+            "bbox_height": 5.4,
+            "stroke_width": 0.6000000238418579,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 8676,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 2.9,
+            "bbox_height": 5.4,
+            "stroke_width": 0.6000000238418579,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "drawing_id": 8691,
+            "type": "s",
+            "point_count": 58,
+            "bbox_width": 2.9,
+            "bbox_height": 5.4,
+            "stroke_width": 0.6000000238418579,
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        }
+    ]
+}
