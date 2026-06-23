@@ -382,6 +382,135 @@ else:
 
                 if sr.station_area and sr.station_area.diagnostics:
                     with st.expander("🔧 Diagnostics & Profile Verification"):
+                        # ── Pipeline Filtering Steps ─────────────────────
+                        if sr.profiles:
+                            st.markdown("**🔍 Pipeline Filtering Steps**")
+                            st.caption(
+                                "Visualizes each filtering stage: all extracted paths → grid removal → noise removal. "
+                                "Red = grid lines removed, Orange = noise removed, Blue/Gray = kept paths."
+                            )
+
+                            # Collect the different path groups
+                            all_paths_list = []
+                            grid_paths = sr.profiles.grid_lines or []
+                            noise_paths = sr.profiles.noise or []
+                            candidate_paths = sr.profiles.candidates or []
+                            eg_path = sr.profiles.existing_ground
+                            pg_path = sr.profiles.proposed_grade
+
+                            # Reconstruct "all input paths" = grids + noise + candidates + selected profiles
+                            all_paths_list = list(grid_paths) + list(noise_paths)
+                            # Add candidates (which include selected profiles)
+                            if candidate_paths:
+                                all_paths_list += list(candidate_paths)
+                            # Add selected profiles if not already in candidates
+                            for prof in [eg_path, pg_path]:
+                                if prof and prof not in all_paths_list:
+                                    all_paths_list.append(prof)
+
+                            # After grid removal = everything minus grids
+                            after_grid = list(noise_paths)
+                            if candidate_paths:
+                                after_grid += list(candidate_paths)
+                            for prof in [eg_path, pg_path]:
+                                if prof and prof not in after_grid:
+                                    after_grid.append(prof)
+
+                            # After noise removal = candidates + selected profiles
+                            after_noise = list(candidate_paths) if candidate_paths else []
+                            for prof in [eg_path, pg_path]:
+                                if prof and prof not in after_noise:
+                                    after_noise.append(prof)
+
+                            diag_info = sr.profiles.diagnostics or {}
+
+                            # --- Plot 1: All Input Paths ---
+                            fig_steps, axes = plt.subplots(1, 3, figsize=(18, 5))
+
+                            def plot_paths_on_ax(ax, paths, title, highlight_grids=False, highlight_noise=False):
+                                """Helper to plot a list of ExtractedPath on a matplotlib axis."""
+                                for p in paths:
+                                    if len(p.points) < 2:
+                                        continue
+                                    xs = [pt[0] for pt in p.points]
+                                    ys = [pt[1] for pt in p.points]
+
+                                    # Determine color/style based on path type
+                                    if highlight_grids and p in grid_paths:
+                                        ax.plot(xs, ys, color="#ef4444", lw=0.6, alpha=0.5)
+                                    elif highlight_noise and p in noise_paths:
+                                        ax.plot(xs, ys, color="#f97316", lw=0.6, alpha=0.5)
+                                    elif p is eg_path:
+                                        ax.plot(xs, ys, color="#6b7280", lw=1.5, ls="--", alpha=0.9)
+                                    elif p is pg_path:
+                                        ax.plot(xs, ys, color="#3b82f6", lw=1.5, alpha=0.9)
+                                    else:
+                                        ax.plot(xs, ys, color="#94a3b8", lw=0.5, alpha=0.4)
+
+                                ax.set_title(title, fontsize=11, fontweight="700", pad=8)
+                                ax.set_xlabel("PDF X (pt)", fontsize=9)
+                                ax.set_ylabel("PDF Y (pt)", fontsize=9)
+                                ax.invert_yaxis()
+                                ax.grid(True, alpha=0.15, lw=0.4)
+                                ax.set_facecolor("#fafafa")
+                                ax.tick_params(labelsize=8)
+
+                            # Plot 1: All input paths (grids highlighted in red)
+                            plot_paths_on_ax(
+                                axes[0], all_paths_list,
+                                f"① All Input Paths ({len(all_paths_list)})",
+                                highlight_grids=True, highlight_noise=True,
+                            )
+                            # Add legend for Plot 1
+                            from matplotlib.lines import Line2D
+                            legend_handles = [
+                                Line2D([0], [0], color="#ef4444", lw=1.5, label=f"Grid lines ({len(grid_paths)})"),
+                                Line2D([0], [0], color="#f97316", lw=1.5, label=f"Noise ({len(noise_paths)})"),
+                                Line2D([0], [0], color="#94a3b8", lw=1.5, label="Other paths"),
+                            ]
+                            axes[0].legend(handles=legend_handles, fontsize=7, loc="upper right", framealpha=0.8)
+
+                            # Plot 2: After grid removal (noise highlighted in orange)
+                            plot_paths_on_ax(
+                                axes[1], after_grid,
+                                f"② After Grid Removal ({len(after_grid)})\n{len(grid_paths)} grid lines removed",
+                                highlight_noise=True,
+                            )
+                            legend_handles_2 = [
+                                Line2D([0], [0], color="#f97316", lw=1.5, label=f"Noise ({len(noise_paths)})"),
+                                Line2D([0], [0], color="#94a3b8", lw=1.5, label="Kept paths"),
+                            ]
+                            axes[1].legend(handles=legend_handles_2, fontsize=7, loc="upper right", framealpha=0.8)
+
+                            # Plot 3: After noise removal (clean candidates)
+                            plot_paths_on_ax(
+                                axes[2], after_noise,
+                                f"③ After Noise Removal ({len(after_noise)})\n{len(noise_paths)} noise paths removed",
+                            )
+                            legend_handles_3 = [
+                                Line2D([0], [0], color="#6b7280", lw=1.5, ls="--", label="Existing Ground"),
+                                Line2D([0], [0], color="#3b82f6", lw=1.5, label="Proposed Grade"),
+                                Line2D([0], [0], color="#94a3b8", lw=1.5, label="Other candidates"),
+                            ]
+                            axes[2].legend(handles=legend_handles_3, fontsize=7, loc="upper right", framealpha=0.8)
+
+                            plt.tight_layout()
+                            st.pyplot(fig_steps)
+                            plt.close(fig_steps)
+
+                            # Summary counts
+                            sc1, sc2, sc3, sc4 = st.columns(4)
+                            with sc1:
+                                st.metric("Total Input Paths", diag_info.get("total_paths", len(all_paths_list)))
+                            with sc2:
+                                st.metric("Grid Lines Removed", diag_info.get("grid_lines_removed", len(grid_paths)))
+                            with sc3:
+                                st.metric("Noise Removed", diag_info.get("noise_removed", len(noise_paths)))
+                            with sc4:
+                                st.metric("Candidates Remaining", diag_info.get("candidates_remaining", len(after_noise)))
+
+                            st.markdown("---")
+
                         # profile summary metrics
                         st.markdown("**Profile Selection Summary**")
                         prof_data = []

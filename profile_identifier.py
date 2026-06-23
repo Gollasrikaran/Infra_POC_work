@@ -25,12 +25,15 @@ class IdentifiedProfiles:
 class ProfileIdentifier:
 
     def __init__(self, grid_coverage=0.75, min_profile_coverage=0.25,
-                 min_length=10.0, noise_max_pts=3, noise_max_len=15.0):
+                 min_length=10.0, noise_max_pts=3, noise_max_len=15.0,
+                 min_grid_lines=5, grid_straightness=3.0):
         self.grid_coverage = grid_coverage
         self.min_profile_coverage = min_profile_coverage
         self.min_length = min_length
         self.noise_max_pts = noise_max_pts
         self.noise_max_len = noise_max_len
+        self.min_grid_lines = min_grid_lines
+        self.grid_straightness = grid_straightness
 
     def identify(self, paths, page_width, page_height):
         result = IdentifiedProfiles()
@@ -68,6 +71,7 @@ class ProfileIdentifier:
                 "width": round(p.width, 1),
                 "height": round(p.height, 1),
                 "dashes": p.dashes,
+                "is_dashed": self._is_dashed(p),
                 "stroke_w": round(p.stroke_width, 2),
                 "color": str(p.color),
             })
@@ -97,25 +101,93 @@ class ProfileIdentifier:
         return result
 
     def _filter_grids(self, paths, page_w, page_h):
-        grids, keep = [], []
-        h_thresh = page_w * self.grid_coverage
-        v_thresh = page_h * self.grid_coverage
+        """Filter grid lines using clustering of nearly-straight segments.
+
+        Detects grid patterns by:
+        1. Identifying all nearly-horizontal segments (small y_span)
+           and nearly-vertical segments (small x_span)
+        2. Clustering horizontal segments by Y position and vertical by X position
+        3. If enough clusters exist in both directions → grid detected
+        4. Removing all segments belonging to grid clusters
+
+        This handles PDFs where grid lines are drawn as many short segments
+        rather than single page-spanning lines.
+        """
+        CLUSTER_TOL = 2.5     # merge segments within this distance as same grid line
+        MIN_SEG_LEN = 5.0     # ignore very tiny segments for grid detection
+
+        horizontal = []   # (path, y_center)
+        vertical = []     # (path, x_center)
 
         for path in paths:
             if path.point_count < 2:
-                keep.append(path)
                 continue
 
             pts = np.array(path.points)
             x_span = pts[:, 0].max() - pts[:, 0].min()
             y_span = pts[:, 1].max() - pts[:, 1].min()
 
-            if (x_span > h_thresh and y_span < 2.0) or (y_span > v_thresh and x_span < 2.0):
-                grids.append(path)
-            else:
-                keep.append(path)
+            # Nearly-horizontal: small vertical variation, some horizontal extent
+            if y_span <= self.grid_straightness and x_span >= MIN_SEG_LEN:
+                horizontal.append((path, float(pts[:, 1].mean())))
+            # Nearly-vertical: small horizontal variation, some vertical extent
+            elif x_span <= self.grid_straightness and y_span >= MIN_SEG_LEN:
+                vertical.append((path, float(pts[:, 0].mean())))
+
+        # Cluster and count distinct grid lines in each direction
+        h_grid_ids, h_cluster_count = self._find_grid_clusters(horizontal, CLUSTER_TOL)
+        v_grid_ids, v_cluster_count = self._find_grid_clusters(vertical, CLUSTER_TOL)
+
+        # A real grid has multiple lines in BOTH directions
+        has_grid = (h_cluster_count >= self.min_grid_lines
+                    and v_cluster_count >= self.min_grid_lines)
+
+        if not has_grid:
+            # No grid detected — return all paths unchanged
+            return paths, []
+
+        # Removal pass: separate grid segments from real geometry
+        grid_ids = h_grid_ids | v_grid_ids
+        grids = [p for p in paths if id(p) in grid_ids]
+        keep = [p for p in paths if id(p) not in grid_ids]
 
         return keep, grids
+
+    def _find_grid_clusters(self, items, tolerance):
+        """Cluster (path, position) items by position to find grid lines.
+
+        Groups nearly-colinear segments together (e.g., multiple short
+        horizontal segments at the same Y coordinate = one grid line).
+
+        Returns:
+            (grid_path_ids, num_clusters) — set of path ids and count of
+            distinct grid lines detected.
+        """
+        if not items:
+            return set(), 0
+
+        # Sort by position (Y for horizontal, X for vertical)
+        sorted_items = sorted(items, key=lambda x: x[1])
+
+        # Build clusters of segments at similar positions
+        clusters = []
+        current_cluster = [sorted_items[0]]
+
+        for i in range(1, len(sorted_items)):
+            if sorted_items[i][1] - current_cluster[-1][1] <= tolerance:
+                current_cluster.append(sorted_items[i])
+            else:
+                clusters.append(current_cluster)
+                current_cluster = [sorted_items[i]]
+        clusters.append(current_cluster)
+
+        # Collect all path ids from all clusters
+        grid_ids = set()
+        for cluster in clusters:
+            for path, _ in cluster:
+                grid_ids.add(id(path))
+
+        return grid_ids, len(clusters)
 
     def _filter_noise(self, paths):
         noise, keep = [], []
@@ -127,16 +199,22 @@ class ProfileIdentifier:
                 keep.append(path)
         return keep, noise
 
+
     def _score(self, paths, page_w, page_h):
         scored = []
 
         for path in paths:
+            if self._is_frame_or_border(path, page_w, page_h):
+                continue
+
             pts = np.array(path.points)
             x_range = pts[:, 0].max() - pts[:, 0].min()
             y_range = pts[:, 1].max() - pts[:, 1].min()
             h_cov = x_range / page_w
 
-            if h_cov < self.min_profile_coverage:
+            is_dashed = self._is_dashed(path)
+            min_cov = self.min_profile_coverage if is_dashed else 0.005
+            if h_cov < min_cov:
                 continue
 
             score = 0.0
@@ -146,18 +224,19 @@ class ProfileIdentifier:
             if y_range > 0:
                 score += min((x_range / y_range) / 10, 1.0) * 10
             y_center = pts[:, 1].mean()
-            score += (1 - abs(y_center - page_h / 2) / (page_h / 2)) * 10
+            center_bonus = 1 - abs(y_center - page_h / 2) / (page_h / 2)
+            score += max(0.0, center_bonus) * 10
 
-            scored.append((path, score))
+            scored.append((path, float(score)))
 
         scored.sort(key=lambda x: x[1], reverse=True)
         return scored
 
     def _classify(self, scored, result):
         """Dashed = existing ground, Solid = proposed grade."""
-        top = scored[:min(10, len(scored))]
-        dashed = [(p, s) for p, s in top if p.dashes is not None]
-        solid = [(p, s) for p, s in top if p.dashes is None]
+        top = scored[:min(20, len(scored))]
+        dashed = [(p, s) for p, s in top if self._is_dashed(p)]
+        solid = [(p, s) for p, s in top if not self._is_dashed(p)]
 
         if dashed and solid:
             result.existing_ground = dashed[0][0]
@@ -175,3 +254,21 @@ class ProfileIdentifier:
             result.existing_ground = scored[1][0]
         elif len(scored) == 1:
             result.proposed_grade = scored[0][0]
+
+    def _is_dashed(self, path):
+        """Return True only for actual dash patterns, not PyMuPDF's solid [] marker."""
+        if not path.dashes:
+            return False
+        dash = str(path.dashes).strip()
+        return dash not in ("[] 0", "[]")
+
+    def _is_frame_or_border(self, path, page_w, region_h):
+        """Reject sheet/viewport borders that overlap a region but are not profiles."""
+        if not path.bbox:
+            return False
+
+        very_wide = path.width >= page_w * 0.85
+        much_taller_than_region = path.height >= max(region_h * 1.5, 100.0)
+        is_closed_quad = "qu" in path.item_types and path.point_count <= 5
+
+        return very_wide and much_taller_than_region and is_closed_quad
