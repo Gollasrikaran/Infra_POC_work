@@ -1,6 +1,10 @@
 """
 Aligns both profiles onto common station intervals so they can be
 compared point-by-point for cut/fill calculation.
+
+Uses the INTERSECTION (overlap) of both profiles' offset ranges,
+because earthwork should only be computed where the proposed design
+actually exists.
 """
 
 import numpy as np
@@ -29,10 +33,14 @@ class ProfileNormalizer:
         if len(proposed.stations) < 2:
             raise ValueError(f"Proposed grade has too few points: {len(proposed.stations)}")
 
+        # Use INTERSECTION — earthwork only where both profiles have data
+        eg_min, eg_max = float(existing.stations.min()), float(existing.stations.max())
+        pg_min, pg_max = float(proposed.stations.min()), float(proposed.stations.max())
+
         if sta_start is None:
-            sta_start = max(existing.stations.min(), proposed.stations.min())
+            sta_start = max(eg_min, pg_min)
         if sta_end is None:
-            sta_end = min(existing.stations.max(), proposed.stations.max())
+            sta_end = min(eg_max, pg_max)
 
         if sta_end <= sta_start:
             raise ValueError(
@@ -50,6 +58,10 @@ class ProfileNormalizer:
         result.diagnostics = {
             "existing_points": len(existing.stations),
             "proposed_points": len(proposed.stations),
+            "existing_range": (eg_min, eg_max),
+            "proposed_range": (pg_min, pg_max),
+            "overlap_range": (sta_start, sta_end),
+            "overlap_width": sta_end - sta_start,
             "common_stations": len(stations),
             "method": self.method,
             "interval": self.interval,
@@ -57,6 +69,7 @@ class ProfileNormalizer:
         return result
 
     def _interp(self, x, y, x_new):
+        """Interpolate within known range; hold edge values flat outside."""
         valid = ~(np.isnan(x) | np.isnan(y))
         xc, yc = x[valid], y[valid]
 

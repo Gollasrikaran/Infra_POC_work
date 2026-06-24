@@ -37,6 +37,7 @@ class StationResult:
         self.proposed_transformed = None
         self.normalized = None
         self.station_area = None
+        self.raw_paths_count = 0
 
         self.success = False
         self.error = None
@@ -185,6 +186,7 @@ class VectorPipeline:
             # extract geometry within this region's Y bounds
             sr.stage_reached = "extraction"
             paths = self.extractor.extract_region(page, region.y_top, region.y_bottom)
+            sr.raw_paths_count = len(paths) if paths else 0
             if not paths:
                 sr.error = f"No geometry found in region y=[{region.y_top:.0f}, {region.y_bottom:.0f}]"
                 return sr
@@ -197,6 +199,7 @@ class VectorPipeline:
             if not profiles.existing_ground:
                 sr.error = "Could not identify Existing Ground profile."
                 return sr
+
             if not profiles.proposed_grade:
                 sr.error = "Could not identify Proposed Grade profile."
                 return sr

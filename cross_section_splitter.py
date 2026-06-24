@@ -182,5 +182,8 @@ class CrossSectionSplitter:
             if abs(y - axis_y) < self.axis_tol:
                 m = re.match(r"^-?\d{1,3}$", txt)
                 if m:
-                    offsets.append(int(txt))
+                    val = int(txt)
+                    # reject elevation-like values that leaked into the axis row
+                    if abs(val) <= 200:
+                        offsets.append(val)
         return sorted(set(offsets))

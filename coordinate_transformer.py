@@ -69,6 +69,9 @@ class CoordinateTransformer:
                 m = re.match(r"^(-?\d{1,3})$", txt.strip())
                 if m:
                     offset_ft = float(m.group(1))
+                    # reject elevation values that leak into the X-axis row
+                    if abs(offset_ft) > 200:
+                        continue
                     x_ticks.append((x, offset_ft))
 
         # collect elevation labels on the left edge within region
