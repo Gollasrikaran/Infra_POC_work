@@ -12,16 +12,22 @@ class ExtractedPath:
 
     def __init__(self, path_id, points, color=None, fill_color=None,
                  stroke_width=0.0, dashes=None, is_filled=False,
-                 bbox=None, item_types=None):
+                 bbox=None, item_types=None, raw_dashes=None,
+                 segment_count=1, dash_segments=0, solid_segments=0):
         self.path_id = path_id
         self.points = points
         self.color = color
         self.fill_color = fill_color
         self.stroke_width = stroke_width
         self.dashes = dashes
+        self.raw_dashes = raw_dashes          # original PyMuPDF tuple/list
         self.is_filled = is_filled
         self.bbox = bbox
         self.item_types = item_types or []
+        # merge-tracking counters
+        self.segment_count = segment_count    # how many original drawings
+        self.dash_segments = dash_segments    # how many were dashed
+        self.solid_segments = solid_segments  # how many were solid
 
     @property
     def point_count(self):
@@ -92,8 +98,11 @@ class GeometryExtractor:
             if fill and isinstance(fill, (list, tuple)):
                 fill = tuple(round(c, 4) for c in fill)
 
-            dashes = drawing.get("dashes")
-            dash_str = str(dashes) if dashes else None
+            raw_dashes = drawing.get("dashes")
+            dash_str = str(raw_dashes) if raw_dashes else None
+
+            # classify this single segment as dashed or solid
+            is_seg_dashed = self._has_real_dash(raw_dashes)
 
             item_types = [item[0] for item in drawing.get("items", [])]
 
@@ -104,9 +113,13 @@ class GeometryExtractor:
                 fill_color=fill,
                 stroke_width=drawing.get("width", 0.0) or 0.0,
                 dashes=dash_str,
+                raw_dashes=raw_dashes,
                 is_filled=(fill is not None),
                 bbox=bbox,
                 item_types=item_types,
+                segment_count=1,
+                dash_segments=1 if is_seg_dashed else 0,
+                solid_segments=0 if is_seg_dashed else 1,
             ))
 
         return paths
@@ -174,3 +187,25 @@ class GeometryExtractor:
             result.append((round(float(point[0]), 4), round(float(point[1]), 4)))
 
         return result
+
+    @staticmethod
+    def _has_real_dash(raw_dashes):
+        """Return True if the raw PyMuPDF dashes value represents an actual
+        dash pattern, not a solid-line marker like ``[] 0`` or ``None``."""
+        if raw_dashes is None:
+            return False
+        if isinstance(raw_dashes, str):
+            s = raw_dashes.strip()
+            return s not in ("", "[] 0", "[]")
+        # PyMuPDF returns dashes as a tuple/list: (dash_array, phase)
+        # e.g. "[6] 0" → ([6], 0)  or  "[6, 2] 0" → ([6, 2], 0)
+        # Solid lines: ([], 0)
+        if isinstance(raw_dashes, (tuple, list)):
+            if len(raw_dashes) == 0:
+                return False
+            # first element is the dash array
+            dash_array = raw_dashes[0] if isinstance(raw_dashes[0], (list, tuple)) else raw_dashes
+            # filter out phase-only values
+            nums = [v for v in dash_array if isinstance(v, (int, float)) and v > 0]
+            return len(nums) > 0
+        return False

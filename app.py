@@ -466,35 +466,196 @@ else:
                         # --- Tab 3: Profile ID ---
                         with tab3:
                             st.markdown("#### Step 3: Profile Identification & Scoring")
-                            
-                            # Profile summary table
+
+                            # ── Classification confidence indicator ──
+                            _diag = sr.profiles.diagnostics if sr.profiles else {}
+                            _conf = _diag.get("classification_confidence", 0)
+                            _rule = _diag.get("classification_rule", "—")
+                            _signals = _diag.get("classification_signals", {})
+
+                            if _conf >= 0.8:
+                                _conf_color = "#22c55e"
+                                _conf_label = "HIGH"
+                            elif _conf >= 0.5:
+                                _conf_color = "#f59e0b"
+                                _conf_label = "MEDIUM"
+                            else:
+                                _conf_color = "#ef4444"
+                                _conf_label = "LOW"
+
+                            st.markdown(f"""
+                            <div style="background: linear-gradient(135deg, #1e293b, #0f172a);
+                                        border: 2px solid {_conf_color}; border-radius: 12px;
+                                        padding: 1rem 1.5rem; margin-bottom: 1rem;">
+                                <div style="display:flex; align-items:center; gap: 1rem; flex-wrap: wrap;">
+                                    <span style="background:{_conf_color}; color:#fff; padding:3px 12px;
+                                                 border-radius:20px; font-size:.75rem; font-weight:700;">
+                                        {_conf_label} CONFIDENCE ({_conf:.0%})
+                                    </span>
+                                    <span style="color:#94a3b8; font-size:.85rem;">
+                                        Method: <b style="color:#f8fafc;">{_rule}</b>
+                                    </span>
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                            # ── Classification signal votes ──
+                            _votes = _diag.get("classification_votes", {})
+                            if _votes:
+                                st.markdown("**Signal Votes:**")
+                                vote_rows = []
+                                for sig_name, sig_val in _votes.items():
+                                    direction = "→ Candidate 1 is EG" if sig_val > 0 else "→ Candidate 2 is EG"
+                                    vote_rows.append({
+                                        "Signal": sig_name,
+                                        "Vote": f"{sig_val:+.1f}",
+                                        "Interpretation": direction,
+                                    })
+                                st.dataframe(pd.DataFrame(vote_rows), use_container_width=True, hide_index=True)
+
+                            # ── Profile summary table with enhanced metadata ──
                             prof_data = []
                             if sr.profiles and sr.profiles.existing_ground:
                                 eg = sr.profiles.existing_ground
+                                eg_dr = eg.dash_segments / max(eg.dash_segments + eg.solid_segments, 1)
                                 prof_data.append({
-                                    "Profile": "Existing Ground (Dashed)",
+                                    "Profile": "Existing Ground",
                                     "Points": eg.point_count,
                                     "Length (pt)": round(eg.length, 1),
                                     "Width (pt)": round(eg.width, 1),
                                     "Score": round(sr.profiles.existing_ground_score, 2),
-                                    "Stroke Width": round(eg.stroke_width, 2),
+                                    "Dash Ratio": f"{eg_dr:.0%}",
+                                    "Segments": eg.segment_count,
+                                    "Stroke W": round(eg.stroke_width, 2),
                                     "Color": str(eg.color),
                                 })
                             if sr.profiles and sr.profiles.proposed_grade:
                                 pg = sr.profiles.proposed_grade
+                                pg_dr = pg.dash_segments / max(pg.dash_segments + pg.solid_segments, 1)
                                 prof_data.append({
-                                    "Profile": "Proposed Grade (Solid)",
+                                    "Profile": "Proposed Grade",
                                     "Points": pg.point_count,
                                     "Length (pt)": round(pg.length, 1),
                                     "Width (pt)": round(pg.width, 1),
                                     "Score": round(sr.profiles.proposed_grade_score, 2),
-                                    "Stroke Width": round(pg.stroke_width, 2),
+                                    "Dash Ratio": f"{pg_dr:.0%}",
+                                    "Segments": pg.segment_count,
+                                    "Stroke W": round(pg.stroke_width, 2),
                                     "Color": str(pg.color),
                                 })
                             if prof_data:
                                 st.dataframe(pd.DataFrame(prof_data), use_container_width=True, hide_index=True)
 
-                            # raw polyline plot (PDF coordinates)
+                            # ── Overlay comparison: polylines ON TOP of PDF raster ──
+                            st.markdown("---")
+                            st.markdown("**🔍 Cross-Verification Overlay (Extracted Lines on PDF)**")
+                            if sr.region and st.session_state.get("pdf_path"):
+                                _overlay_img = render_pdf_region(
+                                    st.session_state.pdf_path,
+                                    sr.page_number,
+                                    sr.region.y_top,
+                                    sr.region.y_bottom,
+                                    dpi=150,
+                                )
+                                if _overlay_img:
+                                    _dpi = 150
+                                    _scale = _dpi / 72.0
+                                    _margin = 10
+                                    _y_off = max(sr.region.y_top - _margin, 0)
+                                    _page_x0 = 0  # x0 for the clip is always 0
+
+                                    fig_ov, ax_ov = plt.subplots(figsize=(14, 6))
+                                    ax_ov.imshow(_overlay_img, aspect="auto",
+                                                 extent=[0, _overlay_img.width, _overlay_img.height, 0])
+
+                                    # plot EG polyline on overlay (use original path order, not X-sorted)
+                                    if sr.profiles and sr.profiles.existing_ground:
+                                        eg_pts = sr.profiles.existing_ground.points
+                                        if eg_pts:
+                                            ox = [(p[0] - _page_x0) * _scale for p in eg_pts]
+                                            oy = [(p[1] - _y_off) * _scale for p in eg_pts]
+                                            ax_ov.plot(ox, oy, color="#ff4444", lw=2.5, ls="--",
+                                                       label="Existing Ground (extracted)", zorder=5, alpha=0.85)
+
+                                    # plot PG polyline on overlay (use original path order, not X-sorted)
+                                    if sr.profiles and sr.profiles.proposed_grade:
+                                        pg_pts = sr.profiles.proposed_grade.points
+                                        if pg_pts:
+                                            ox = [(p[0] - _page_x0) * _scale for p in pg_pts]
+                                            oy = [(p[1] - _y_off) * _scale for p in pg_pts]
+                                            ax_ov.plot(ox, oy, color="#00bbff", lw=2.5, ls="-",
+                                                       label="Proposed Grade (extracted)", zorder=5, alpha=0.85)
+
+                                    ax_ov.set_title(f"Overlay Verification — STA {sr.station_label}",
+                                                    fontsize=13, fontweight="700")
+                                    ax_ov.legend(fontsize=9, loc="upper right",
+                                                 facecolor="white", edgecolor="#ccc", framealpha=0.9)
+                                    ax_ov.axis("off")
+                                    plt.tight_layout()
+                                    st.pyplot(fig_ov)
+                                    plt.close(fig_ov)
+                                else:
+                                    st.warning("Could not render PDF region for overlay.")
+                            else:
+                                st.info("No region data or PDF path available for overlay.")
+
+                            # ── All candidates overlay ──
+                            st.markdown("---")
+                            st.markdown("**📊 All Scored Candidates (PDF Coordinate Space)**")
+                            if sr.profiles and sr.profiles.scored_list:
+                                fig_ac, ax_ac = plt.subplots(figsize=(14, 6))
+                                _has_bg = False
+
+                                # render background PDF if available
+                                if sr.region and st.session_state.get("pdf_path"):
+                                    _bg_img = render_pdf_region(
+                                        st.session_state.pdf_path,
+                                        sr.page_number,
+                                        sr.region.y_top,
+                                        sr.region.y_bottom,
+                                        dpi=100,
+                                    )
+                                    if _bg_img:
+                                        _s100 = 100 / 72.0
+                                        _m = 10
+                                        _yo = max(sr.region.y_top - _m, 0)
+                                        ax_ac.imshow(_bg_img, aspect="auto", alpha=0.3,
+                                                     extent=[0, _bg_img.width, _bg_img.height, 0])
+                                        _has_bg = True
+
+                                cand_colors = plt.cm.Set1(np.linspace(0, 1, max(len(sr.profiles.scored_list), 1)))
+                                for k, (cpath, cscore) in enumerate(sr.profiles.scored_list[:8]):
+                                    # Use original path order (not X-sorted) to avoid zigzag
+                                    cx = [p[0] for p in cpath.points]
+                                    cy = [p[1] for p in cpath.points]
+                                    _ls = "--" if cpath.dashes and str(cpath.dashes).strip() not in ("[] 0", "[]") else "-"
+                                    _lbl = f"#{k+1} score={cscore:.1f}"
+                                    _dr = cpath.dash_segments / max(cpath.dash_segments + cpath.solid_segments, 1)
+                                    _lbl += f" dash={_dr:.0%}"
+                                    if cpath is (sr.profiles.existing_ground if sr.profiles else None):
+                                        _lbl += " ★EG"
+                                    elif cpath is (sr.profiles.proposed_grade if sr.profiles else None):
+                                        _lbl += " ★PG"
+                                    ax_ac.plot(cx, cy, color=cand_colors[k], lw=1.8, ls=_ls,
+                                               alpha=0.85, label=_lbl, zorder=3 + k)
+
+                                ax_ac.set_xlabel("PDF X (pt)", fontsize=10)
+                                ax_ac.set_ylabel("PDF Y (pt)", fontsize=10)
+                                ax_ac.set_title(f"All Scored Candidates — STA {sr.station_label}",
+                                                fontsize=12, fontweight="600")
+                                ax_ac.legend(fontsize=7, loc="best", framealpha=0.9)
+                                ax_ac.grid(True, alpha=0.15)
+                                # Only invert Y if no background image
+                                # (imshow with extent=[0,w,h,0] already inverts)
+                                if not _has_bg:
+                                    ax_ac.invert_yaxis()
+                                ax_ac.set_facecolor("#fefce8")
+                                plt.tight_layout()
+                                st.pyplot(fig_ac)
+                                plt.close(fig_ac)
+
+                            # ── Raw polyline plot (legacy) ──
+                            st.markdown("---")
                             st.markdown("**Raw Candidate Polylines (PDF Coordinate Space)**")
                             fig2, ax2 = plt.subplots(figsize=(12, 5))
 
