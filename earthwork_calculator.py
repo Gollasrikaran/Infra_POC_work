@@ -1,29 +1,25 @@
 """
-Earthwork calculation for cross-sections.
-
-Two stages:
-  1. Per-station: compute cut area and fill area between existing and proposed profiles
-  2. Between stations: compute volume via Average End Area Method
-     Volume = ((Area1 + Area2) / 2) x distance_between_stations
+Earthwork calculations -- cut/fill area per station + volumes between stations.
+Uses trapezoidal integration for areas, average end area for volumes.
 """
 
 import numpy as np
 import pandas as pd
 
-# numpy 2.0 renamed trapz to trapezoid
+# numpy 2.0 renamed trapz -> trapezoid
 _trapz = getattr(np, "trapezoid", None) or getattr(np, "trapz")
 
 
 class StationArea:
-    """Cut/fill areas at a single cross-section station."""
+    """Stores cut/fill areas for one cross-section."""
 
     def __init__(self, station_label, station_ft, page_number):
         self.station_label = station_label
         self.station_ft = station_ft
         self.page_number = page_number
         self.cut_area = 0.0         # sq ft
-        self.fill_area = 0.0        # sq ft
-        self.net_area = 0.0         # sq ft (cut - fill)
+        self.fill_area = 0.0
+        self.net_area = 0.0         # cut minus fill
         self.offset_range = (0.0, 0.0)
         self.existing_points = 0
         self.proposed_points = 0
@@ -33,12 +29,12 @@ class StationArea:
 class EarthworkResult:
 
     def __init__(self):
-        self.station_areas = []         # list of StationArea
-        self.segment_volumes = []       # list of dicts (between consecutive stations)
-        self.total_cut_area = 0.0       # sum of all cut areas
-        self.total_fill_area = 0.0      # sum of all fill areas
+        self.station_areas = []
+        self.segment_volumes = []       # dicts for each pair of consecutive stations
+        self.total_cut_area = 0.0
+        self.total_fill_area = 0.0
         self.total_cut_volume = 0.0     # cu ft
-        self.total_fill_volume = 0.0    # cu ft
+        self.total_fill_volume = 0.0
         self.total_cut_volume_cy = 0.0  # cu yd
         self.total_fill_volume_cy = 0.0
         self.net_volume = 0.0
@@ -61,7 +57,7 @@ class EarthworkResult:
     def to_volume_dataframe(self):
         return pd.DataFrame(self.segment_volumes)
 
-    # keep old name for app.py compatibility
+    # backwards compat
     def to_dataframe(self):
         return self.to_area_dataframe()
 
@@ -87,7 +83,7 @@ class EarthworkCalculator:
         self.offset_interval = offset_interval
 
     def compute_area(self, normalized, station_label, station_ft, page_number):
-        """Compute cut/fill areas at one cross-section station."""
+        """Cut/fill area at one station using trapezoidal integration."""
         sa = StationArea(station_label, station_ft, page_number)
 
         offsets = normalized.stations
@@ -103,7 +99,7 @@ class EarthworkCalculator:
 
         diff = proposed - existing
 
-        # cut: existing above proposed (diff < 0)
+        # cut where existing is above proposed, fill where it's below
         cut_depths = np.where(diff < 0, np.abs(diff), 0.0)
         fill_heights = np.where(diff > 0, diff, 0.0)
 
@@ -122,19 +118,17 @@ class EarthworkCalculator:
         return sa
 
     def compute_volumes(self, station_areas):
-        """Average End Area between consecutive stations. Returns EarthworkResult."""
+        """Average end area method between consecutive stations."""
         result = EarthworkResult()
 
-        # sort by station
         sorted_areas = sorted(station_areas, key=lambda sa: sa.station_ft)
         result.station_areas = sorted_areas
 
-        # totals for areas
         result.total_cut_area = sum(sa.cut_area for sa in sorted_areas)
         result.total_fill_area = sum(sa.fill_area for sa in sorted_areas)
 
         if len(sorted_areas) < 2:
-            result.diagnostics = {"stations": len(sorted_areas), "note": "need >= 2 stations for volume"}
+            result.diagnostics = {"stations": len(sorted_areas), "note": "need >= 2 for volume"}
             return result
 
         total_cut_vol = 0.0
@@ -148,6 +142,7 @@ class EarthworkCalculator:
             if dist <= 0:
                 continue
 
+            # V = (A1 + A2) / 2 * L
             cut_vol = ((s1.cut_area + s2.cut_area) / 2.0) * dist
             fill_vol = ((s1.fill_area + s2.fill_area) / 2.0) * dist
 

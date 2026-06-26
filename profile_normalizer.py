@@ -1,10 +1,6 @@
 """
-Aligns both profiles onto common station intervals so they can be
-compared point-by-point for cut/fill calculation.
-
-Uses the INTERSECTION (overlap) of both profiles' offset ranges,
-because earthwork should only be computed where the proposed design
-actually exists.
+Aligns EG and PG profiles to a common set of offsets so we can do
+point-by-point cut/fill comparison. Only the overlapping range is used.
 """
 
 import numpy as np
@@ -29,11 +25,11 @@ class ProfileNormalizer:
 
     def normalize(self, existing, proposed, sta_start=None, sta_end=None):
         if len(existing.stations) < 2:
-            raise ValueError(f"Existing ground has too few points: {len(existing.stations)}")
+            raise ValueError(f"EG has too few points: {len(existing.stations)}")
         if len(proposed.stations) < 2:
-            raise ValueError(f"Proposed grade has too few points: {len(proposed.stations)}")
+            raise ValueError(f"PG has too few points: {len(proposed.stations)}")
 
-        # Use INTERSECTION — earthwork only where both profiles have data
+        # overlap range -- only compute earthwork where both profiles exist
         eg_min, eg_max = float(existing.stations.min()), float(existing.stations.max())
         pg_min, pg_max = float(proposed.stations.min()), float(proposed.stations.max())
 
@@ -44,8 +40,8 @@ class ProfileNormalizer:
 
         if sta_end <= sta_start:
             raise ValueError(
-                f"No overlap — existing [{existing.station_range}], "
-                f"proposed [{proposed.station_range}]"
+                f"Profiles don't overlap -- EG [{existing.station_range}], "
+                f"PG [{proposed.station_range}]"
             )
 
         stations = np.arange(sta_start, sta_end + self.interval / 2, self.interval)
@@ -69,7 +65,7 @@ class ProfileNormalizer:
         return result
 
     def _interp(self, x, y, x_new):
-        """Interpolate within known range; hold edge values flat outside."""
+        """Interpolate within known range, clamp to edge values outside."""
         valid = ~(np.isnan(x) | np.isnan(y))
         xc, yc = x[valid], y[valid]
 

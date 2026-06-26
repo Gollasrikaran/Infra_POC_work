@@ -1,8 +1,6 @@
 """
-Batch cross-verification script for Approach 2 (Ground vs. Proposed Line ID).
-
-Processes all cross-section pages in a PDF, extracts profiles, generates
-overlay images and a summary CSV for systematic manual review.
+Batch cross-verification tool -- processes cross-section pages from a PDF,
+extracts profiles, saves overlay PNGs and a summary CSV.
 
 Usage:
     python cross_verify.py <pdf_path> [--output-dir output_merged4] [--pages 45,46,47]
@@ -27,7 +25,7 @@ from profile_identifier import ProfileIdentifier
 
 
 def render_region(pdf_path, page_number, y_top, y_bottom, dpi=150):
-    """Render a region of a PDF page as a PIL Image."""
+    """Render a chunk of a PDF page as a PIL Image."""
     doc = fitz.open(pdf_path)
     page = doc[page_number - 1]
     margin = 10
@@ -43,7 +41,7 @@ def render_region(pdf_path, page_number, y_top, y_bottom, dpi=150):
 
 
 def process_station(pdf_path, page, region, extractor, identifier):
-    """Process one cross-section region and return diagnostics dict."""
+    """Run profile extraction on one station region, return diagnostics."""
     pw = page.rect.width
     region_h = region.y_bottom - region.y_top
 
@@ -54,7 +52,6 @@ def process_station(pdf_path, page, region, extractor, identifier):
     profiles = identifier.identify(paths, pw, region_h)
     diag = profiles.diagnostics.copy()
 
-    # Build summary row
     row = {
         "station": region.station_label,
         "station_ft": region.station_ft,
@@ -100,20 +97,17 @@ def process_station(pdf_path, page, region, extractor, identifier):
         row.update({"pg_points": 0, "pg_length": 0, "pg_dash_ratio": 0,
                      "pg_segments_merged": 0, "pg_color": "--", "pg_stroke_w": 0})
 
-    # classification signal details
     signals = diag.get("classification_signals", {})
     row["signals_used"] = str(signals.get("signals_used", []))
     votes = diag.get("classification_votes", {})
     row["signal_votes"] = str(votes) if votes else "--"
-
-    # failure reason for INCOMPLETE
     row["failure_reason"] = diag.get("failure_reason", "")
 
     return {"row": row, "profiles": profiles, "diag": diag}
 
 
 def generate_overlay(pdf_path, region, profiles, output_path, dpi=150):
-    """Generate overlay PNG: extracted polylines on top of PDF raster."""
+    """Draw extracted polylines on top of the PDF raster."""
     img = render_region(pdf_path, region.page_number,
                         region.y_top, region.y_bottom, dpi=dpi)
 
@@ -124,9 +118,9 @@ def generate_overlay(pdf_path, region, profiles, output_path, dpi=150):
     fig, ax = plt.subplots(figsize=(16, 7))
     ax.imshow(img, aspect="auto", extent=[0, img.width, img.height, 0])
 
-    # overlay EG (use original path order, not X-sorted, to avoid zigzag)
+    # overlay EG (sort by X so it doesn't zigzag)
     if profiles.existing_ground:
-        eg_pts = profiles.existing_ground.points
+        eg_pts = sorted(profiles.existing_ground.points, key=lambda p: p[0])
         ox = [(p[0]) * scale for p in eg_pts]
         oy = [(p[1] - y_off) * scale for p in eg_pts]
         eg = profiles.existing_ground
@@ -134,9 +128,9 @@ def generate_overlay(pdf_path, region, profiles, output_path, dpi=150):
         ax.plot(ox, oy, color="#ff4444", lw=2.5, ls="--", alpha=0.85, zorder=5,
                 label=f"EG (dash={eg_dr:.0%}, pts={eg.point_count})")
 
-    # overlay PG (use original path order, not X-sorted, to avoid zigzag)
+    # overlay PG
     if profiles.proposed_grade:
-        pg_pts = profiles.proposed_grade.points
+        pg_pts = sorted(profiles.proposed_grade.points, key=lambda p: p[0])
         ox = [(p[0]) * scale for p in pg_pts]
         oy = [(p[1] - y_off) * scale for p in pg_pts]
         pg = profiles.proposed_grade
@@ -144,13 +138,11 @@ def generate_overlay(pdf_path, region, profiles, output_path, dpi=150):
         ax.plot(ox, oy, color="#00bbff", lw=2.5, ls="-", alpha=0.85, zorder=5,
                 label=f"PG (dash={pg_dr:.0%}, pts={pg.point_count})")
 
-    # confidence badge
     conf = profiles.classification_confidence
-    conf_str = f"Confidence: {conf:.0%}"
     rule = profiles.diagnostics.get("classification_rule", "--")
 
     ax.set_title(
-        f"STA {region.station_label} (Page {region.page_number}) -- {conf_str}\n"
+        f"STA {region.station_label} (Page {region.page_number}) -- Confidence: {conf:.0%}\n"
         f"Method: {rule}",
         fontsize=12, fontweight="700", pad=10,
     )
@@ -173,7 +165,6 @@ def main():
     output_dir = args.output_dir
     os.makedirs(output_dir, exist_ok=True)
 
-    # classify pages
     print(f"Analyzing {pdf_path}...")
     classifier = PDFClassifier(pdf_path)
     doc_analysis = classifier.analyze()
@@ -186,7 +177,6 @@ def main():
 
     print(f"Found {len(targets)} cross-section page(s) to process.")
 
-    # setup pipeline components
     splitter = CrossSectionSplitter()
     extractor = GeometryExtractor()
     identifier = ProfileIdentifier()
@@ -236,7 +226,6 @@ def main():
 
             if row["status"] == "ok":
                 ok_count += 1
-                # generate overlay
                 safe_name = region.station_label.replace("+", "_")
                 overlay_path = os.path.join(output_dir, f"overlay_sta_{safe_name}_p{region.page_number}.png")
                 try:
@@ -253,10 +242,9 @@ def main():
 
     doc.close()
 
-    # write summary CSV (use utf-8 encoding to avoid cp1252 issues)
+    # write summary CSV
     csv_path = os.path.join(output_dir, "cross_verify_summary.csv")
     if all_rows:
-        # collect all possible keys across all rows
         all_keys = []
         seen = set()
         for r in all_rows:
@@ -265,7 +253,6 @@ def main():
                     all_keys.append(k)
                     seen.add(k)
 
-        # ensure all rows have all keys
         for r in all_rows:
             for k in all_keys:
                 r.setdefault(k, "")

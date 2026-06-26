@@ -1,6 +1,6 @@
 """
-PDF page classifier — figures out which pages are vector vs raster
-and which ones are cross-section drawings (19-series and 23-series).
+Classifies PDF pages -- tells us which are vector vs raster and
+which ones contain cross-section drawings (19-series, 23-series).
 """
 
 import fitz

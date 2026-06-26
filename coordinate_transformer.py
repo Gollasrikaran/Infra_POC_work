@@ -1,12 +1,7 @@
 """
-Converts PDF page coordinates into engineering coordinates for cross-sections.
-
-Cross-section axes:
-  X-axis = offset from centerline (ft), using tick labels -140..0..140
-  Y-axis = elevation (ft), using labels like 650, 660, 670...
-
-Uses known text label positions within each graph region to build
-a precise linear mapping.
+Converts PDF page coordinates into real-world engineering coords.
+X axis = offset from centerline (ft), Y axis = elevation (ft).
+Reads tick labels from the PDF text to build a linear mapping.
 """
 
 import re
@@ -15,20 +10,18 @@ import numpy as np
 
 
 class RegionScale:
-    """Mapping parameters for one cross-section graph region."""
+    """Linear mapping params for one cross-section graph region."""
 
     def __init__(self):
-        # offset (X) mapping: PDF x -> offset ft
         self.x_ticks = []       # [(pdf_x, offset_ft), ...]
-        self.x_slope = 1.0      # offset_ft per PDF pt
+        self.x_slope = 1.0
         self.x_intercept = 0.0
 
-        # elevation (Y) mapping: PDF y -> elevation ft
         self.y_ticks = []       # [(pdf_y, elevation_ft), ...]
-        self.y_slope = -1.0     # elevation per PDF pt (negative: PDF Y is flipped)
+        self.y_slope = -1.0     # negative because PDF Y is flipped
         self.y_intercept = 0.0
 
-        self.h_scale_ft = 10.0  # nominal ft per inch
+        self.h_scale_ft = 10.0  # nominal ft/inch
         self.v_scale_ft = 10.0
 
 
@@ -38,7 +31,7 @@ class TransformedProfile:
     def __init__(self, offsets, elevations, label=""):
         self.offsets = offsets
         self.elevations = elevations
-        self.stations = offsets       # alias for compatibility
+        self.stations = offsets       # alias
         self.label = label
 
     @property
@@ -57,24 +50,22 @@ class TransformedProfile:
 class CoordinateTransformer:
 
     def build_scale(self, page, region):
-        """Build scale mapping from text labels within a cross-section region."""
+        """Build scale mapping from text labels in the cross-section region."""
         scale = RegionScale()
-
         spans = self._get_spans(page)
 
-        # collect offset tick labels on the X-axis row (at y_bottom)
+        # offset tick labels along the X axis (at y_bottom)
         x_ticks = []
         for y, x, txt, sz in spans:
             if abs(y - region.y_bottom) < 3.0:
                 m = re.match(r"^(-?\d{1,3})$", txt.strip())
                 if m:
                     offset_ft = float(m.group(1))
-                    # reject elevation values that leak into the X-axis row
-                    if abs(offset_ft) > 200:
+                    if abs(offset_ft) > 200:  # skip elevation values that leak in
                         continue
                     x_ticks.append((x, offset_ft))
 
-        # collect elevation labels on the left edge within region
+        # elevation labels on left edge
         y_ticks = []
         for y, x, txt, sz in spans:
             if region.y_top - 5 <= y <= region.y_bottom + 5 and x < page.rect.width * 0.12:
@@ -83,18 +74,17 @@ class CoordinateTransformer:
                     elev_ft = float(m.group(1))
                     y_ticks.append((y, elev_ft))
 
-        # fit linear mapping for X: pdf_x -> offset_ft
+        # least-squares fit for X mapping
         if len(x_ticks) >= 2:
             scale.x_ticks = x_ticks
             px = np.array([t[0] for t in x_ticks])
             ft = np.array([t[1] for t in x_ticks])
-            # least-squares fit
             A = np.vstack([px, np.ones(len(px))]).T
             slope, intercept = np.linalg.lstsq(A, ft, rcond=None)[0]
             scale.x_slope = slope
             scale.x_intercept = intercept
 
-        # fit linear mapping for Y: pdf_y -> elevation_ft
+        # same for Y mapping
         if len(y_ticks) >= 2:
             scale.y_ticks = y_ticks
             py = np.array([t[0] for t in y_ticks])
@@ -104,13 +94,11 @@ class CoordinateTransformer:
             scale.y_slope = slope
             scale.y_intercept = intercept
 
-        # read nominal scale from bottom of page
         self._read_nominal_scale(page, scale)
-
         return scale
 
     def transform(self, pdf_points, scale, label=""):
-        """Convert list of (x, y) PDF coords into offset/elevation arrays."""
+        """Convert (x,y) PDF coords into offset/elevation arrays."""
         if not pdf_points:
             return TransformedProfile(np.array([]), np.array([]), label)
 
@@ -119,17 +107,17 @@ class CoordinateTransformer:
         offsets = pts[:, 0] * scale.x_slope + scale.x_intercept
         elevations = pts[:, 1] * scale.y_slope + scale.y_intercept
 
-        # sort by offset (left to right)
+        # sort left-to-right
         order = np.argsort(offsets)
         offsets = offsets[order]
         elevations = elevations[order]
 
-        # remove duplicate offsets
+        # drop duplicate offsets
         mask = np.diff(offsets, prepend=-np.inf) > 0.01
         return TransformedProfile(offsets[mask], elevations[mask], label)
 
     def _read_nominal_scale(self, page, scale):
-        """Read HORIZONTAL/VERTICAL scale text from page bottom."""
+        """Try to grab HORIZONTAL/VERTICAL scale text from page bottom."""
         rect = page.rect
         bottom = fitz.Rect(0, rect.height * 0.85, rect.width, rect.height)
         text = page.get_text("text", clip=bottom)

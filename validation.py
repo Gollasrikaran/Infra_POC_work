@@ -1,5 +1,5 @@
 """
-Validates cross-section results and generates reports.
+Validates cross-section results and generates reports (plots, JSON, CSV).
 """
 
 import json
@@ -29,12 +29,11 @@ class ValidationResult:
 class Validator:
 
     def validate_cross_sections(self, earthwork, station_results):
-        """Validate aggregate cross-section results."""
         result = ValidationResult()
 
         n = len(earthwork.station_areas)
         if n < 2:
-            result.warn(f"Only {n} station(s) — need at least 2 for volume calculation.")
+            result.warn(f"Only {n} station(s) -- need at least 2 for volume calc.")
 
         if n >= 2:
             areas = earthwork.station_areas
@@ -44,11 +43,10 @@ class Validator:
                 if sa.fill_area < 0:
                     result.error(f"Negative fill area at {sa.station_label}")
 
-            # check station spacing
             for i in range(len(areas) - 1):
                 dist = areas[i + 1].station_ft - areas[i].station_ft
                 if dist <= 0:
-                    result.error(f"Non-increasing stations: {areas[i].station_label} → {areas[i+1].station_label}")
+                    result.error(f"Non-increasing stations: {areas[i].station_label} -> {areas[i+1].station_label}")
                 if dist > 500:
                     result.warn(f"Large gap ({dist:.0f} ft) between {areas[i].station_label} and {areas[i+1].station_label}")
 
@@ -77,10 +75,9 @@ class ReportGenerator:
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def plot_cross_sections(self, station_results, earthwork, label=""):
-        """Bar chart of cut/fill areas per station + volume summary."""
+        """Bar chart of cut/fill areas + volume summary table."""
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8), gridspec_kw={"height_ratios": [3, 1]})
 
-        # plot 1: cut/fill areas per station
         labels = [s.station_area.station_label for s in station_results if s.station_area]
         cuts = [s.station_area.cut_area for s in station_results if s.station_area]
         fills = [s.station_area.fill_area for s in station_results if s.station_area]
@@ -98,7 +95,7 @@ class ReportGenerator:
         ax1.grid(True, alpha=0.2, axis="y")
         ax1.set_facecolor("#f8fafc")
 
-        # plot 2: volume summary table
+        # summary table below the chart
         ax2.axis("off")
         table_data = [
             ["Total Cut Volume", f"{earthwork.total_cut_volume_cy:,.1f} cu yd"],
@@ -112,7 +109,6 @@ class ReportGenerator:
         table.set_fontsize(10)
         table.scale(0.8, 1.5)
 
-        # style header
         for j in range(2):
             table[0, j].set_facecolor("#1e293b")
             table[0, j].set_text_props(color="white", fontweight="bold")
@@ -126,7 +122,7 @@ class ReportGenerator:
         return save_path
 
     def plot_station_profile(self, normalized, station_area, label="", save_path=None):
-        """Single cross-section profile plot with cut/fill shading."""
+        """Single cross-section with cut/fill shading."""
         fig, ax = plt.subplots(figsize=(12, 5))
 
         offsets = normalized.stations
@@ -146,7 +142,7 @@ class ReportGenerator:
         ax.set_ylabel("Elevation (ft)", fontsize=11, fontweight="600")
         title = f"Cross-Section at STA {station_area.station_label}"
         if label:
-            title += f"  —  {label}"
+            title += f"  --  {label}"
         ax.set_title(title, fontsize=13, fontweight="700", pad=10)
         ax.legend(loc="upper right", fontsize=9)
         ax.grid(True, alpha=0.3, lw=0.5)

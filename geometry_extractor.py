@@ -1,6 +1,6 @@
 """
-Extracts vector geometry (lines, curves, paths) from a PDF page
-using PyMuPDF's drawing API. Returns structured polyline data.
+Pulls vector geometry (lines, curves) from a PDF page using PyMuPDF's
+drawing API. Returns structured polyline data for profile identification.
 """
 
 import fitz
@@ -8,7 +8,7 @@ import numpy as np
 
 
 class ExtractedPath:
-    """One vector path pulled from the PDF."""
+    """One vector path from the PDF."""
 
     def __init__(self, path_id, points, color=None, fill_color=None,
                  stroke_width=0.0, dashes=None, is_filled=False,
@@ -20,14 +20,14 @@ class ExtractedPath:
         self.fill_color = fill_color
         self.stroke_width = stroke_width
         self.dashes = dashes
-        self.raw_dashes = raw_dashes          # original PyMuPDF tuple/list
+        self.raw_dashes = raw_dashes
         self.is_filled = is_filled
         self.bbox = bbox
         self.item_types = item_types or []
-        # merge-tracking counters
-        self.segment_count = segment_count    # how many original drawings
-        self.dash_segments = dash_segments    # how many were dashed
-        self.solid_segments = solid_segments  # how many were solid
+        # these get accumulated during merging
+        self.segment_count = segment_count
+        self.dash_segments = dash_segments
+        self.solid_segments = solid_segments
 
     @property
     def point_count(self):
@@ -60,18 +60,17 @@ class GeometryExtractor:
         self.bezier_steps = bezier_steps
 
     def extract(self, page):
-        """Pull all vector paths from a fitz.Page."""
+        """Pull all vector paths from a page."""
         return self._build_paths(page.get_drawings())
 
     def extract_region(self, page, y_top, y_bottom, margin=5.0):
-        """Pull vector paths only from drawings within a Y range."""
+        """Pull vector paths only from drawings that overlap a Y range."""
         drawings = page.get_drawings()
         filtered = []
         for d in drawings:
             r = d.get("rect")
             if not r:
                 continue
-            # keep drawings that overlap the region
             if r.y1 >= (y_top - margin) and r.y0 <= (y_bottom + margin):
                 filtered.append(d)
         return self._build_paths(filtered)
@@ -101,7 +100,6 @@ class GeometryExtractor:
             raw_dashes = drawing.get("dashes")
             dash_str = str(raw_dashes) if raw_dashes else None
 
-            # classify this single segment as dashed or solid
             is_seg_dashed = self._has_real_dash(raw_dashes)
 
             item_types = [item[0] for item in drawing.get("items", [])]
@@ -125,7 +123,7 @@ class GeometryExtractor:
         return paths
 
     def _parse_items(self, items):
-        """Convert PyMuPDF drawing items into a flat list of (x, y) tuples."""
+        """Turn PyMuPDF drawing items into a flat list of (x, y) tuples."""
         points = []
 
         for item in items:
@@ -158,7 +156,7 @@ class GeometryExtractor:
         return points
 
     def _add(self, points, pt):
-        """Append point, skipping consecutive duplicates."""
+        """Append point, skip consecutive duplicates."""
         if isinstance(pt, fitz.Point):
             x, y = round(pt.x, 4), round(pt.y, 4)
         elif isinstance(pt, (tuple, list)) and len(pt) >= 2:
@@ -171,7 +169,7 @@ class GeometryExtractor:
         points.append((x, y))
 
     def _bezier(self, p0, p1, p2, p3):
-        """Cubic bezier interpolation."""
+        """Cubic bezier -> list of interpolated points."""
         def to_arr(p):
             if isinstance(p, fitz.Point):
                 return np.array([p.x, p.y])
@@ -190,22 +188,17 @@ class GeometryExtractor:
 
     @staticmethod
     def _has_real_dash(raw_dashes):
-        """Return True if the raw PyMuPDF dashes value represents an actual
-        dash pattern, not a solid-line marker like ``[] 0`` or ``None``."""
+        """Check if dashes value is an actual dash pattern vs just solid."""
         if raw_dashes is None:
             return False
         if isinstance(raw_dashes, str):
             s = raw_dashes.strip()
             return s not in ("", "[] 0", "[]")
-        # PyMuPDF returns dashes as a tuple/list: (dash_array, phase)
-        # e.g. "[6] 0" → ([6], 0)  or  "[6, 2] 0" → ([6, 2], 0)
-        # Solid lines: ([], 0)
+        # PyMuPDF gives dashes as tuple/list e.g. ([6], 0) or ([6, 2], 0)
         if isinstance(raw_dashes, (tuple, list)):
             if len(raw_dashes) == 0:
                 return False
-            # first element is the dash array
             dash_array = raw_dashes[0] if isinstance(raw_dashes[0], (list, tuple)) else raw_dashes
-            # filter out phase-only values
             nums = [v for v in dash_array if isinstance(v, (int, float)) and v > 0]
             return len(nums) > 0
         return False

@@ -1,7 +1,6 @@
 """
-Streamlit app — Cross-Section Vector Extraction Pipeline.
-Upload a highway PDF → classify pages → split into stations →
-extract profiles → compute cut/fill areas → Average End Area volumes.
+Streamlit UI for the cross-section extraction pipeline.
+Upload a highway PDF, pick pages, extract profiles, see cut/fill results.
 """
 
 import streamlit as st
@@ -157,7 +156,7 @@ st.markdown("""
 </div>""", unsafe_allow_html=True)
 
 
-# ── Step 1: Upload ──────────────────────────────────────────────────────────
+# Upload and classify section
 
 st.markdown("### Step 1 — Upload & Classify PDF")
 
@@ -206,7 +205,7 @@ if pdf_file is not None:
 st.divider()
 
 
-# ── Step 2: Select Pages ─────────────────────────────────────────────────────
+# Page selection section
 
 st.markdown("### Step 2 — Select Pages")
 
@@ -229,7 +228,7 @@ else:
 st.divider()
 
 
-# ── Step 3: Run ──────────────────────────────────────────────────────────────
+# Pipeline execution section
 
 st.markdown("### Step 3 — Run Pipeline")
 
@@ -279,7 +278,7 @@ else:
 st.divider()
 
 
-# ── Step 4: Results ──────────────────────────────────────────────────────────
+# Results section
 
 st.markdown("### Step 4 — Results")
 
@@ -467,7 +466,7 @@ else:
                         with tab3:
                             st.markdown("#### Step 3: Profile Identification & Scoring")
 
-                            # ── Classification confidence indicator ──
+                            # confidence badge
                             _diag = sr.profiles.diagnostics if sr.profiles else {}
                             _conf = _diag.get("classification_confidence", 0)
                             _rule = _diag.get("classification_rule", "—")
@@ -499,7 +498,7 @@ else:
                             </div>
                             """, unsafe_allow_html=True)
 
-                            # ── Classification signal votes ──
+                            # signal votes table
                             _votes = _diag.get("classification_votes", {})
                             if _votes:
                                 st.markdown("**Signal Votes:**")
@@ -513,7 +512,7 @@ else:
                                     })
                                 st.dataframe(pd.DataFrame(vote_rows), use_container_width=True, hide_index=True)
 
-                            # ── Profile summary table with enhanced metadata ──
+                            # profile summary table
                             prof_data = []
                             if sr.profiles and sr.profiles.existing_ground:
                                 eg = sr.profiles.existing_ground
@@ -546,7 +545,7 @@ else:
                             if prof_data:
                                 st.dataframe(pd.DataFrame(prof_data), use_container_width=True, hide_index=True)
 
-                            # ── Overlay comparison: polylines ON TOP of PDF raster ──
+                            # overlay: extracted lines on top of PDF
                             st.markdown("---")
                             st.markdown("**🔍 Cross-Verification Overlay (Extracted Lines on PDF)**")
                             if sr.region and st.session_state.get("pdf_path"):
@@ -568,23 +567,24 @@ else:
                                     ax_ov.imshow(_overlay_img, aspect="auto",
                                                  extent=[0, _overlay_img.width, _overlay_img.height, 0])
 
-                                    # plot EG polyline on overlay (use original path order, not X-sorted)
+                                    # plot EG polyline on overlay (sort by X to avoid zigzag from merge order)
                                     if sr.profiles and sr.profiles.existing_ground:
-                                        eg_pts = sr.profiles.existing_ground.points
+                                        eg_pts = sorted(sr.profiles.existing_ground.points, key=lambda p: p[0])
                                         if eg_pts:
                                             ox = [(p[0] - _page_x0) * _scale for p in eg_pts]
                                             oy = [(p[1] - _y_off) * _scale for p in eg_pts]
                                             ax_ov.plot(ox, oy, color="#ff4444", lw=2.5, ls="--",
                                                        label="Existing Ground (extracted)", zorder=5, alpha=0.85)
 
-                                    # plot PG polyline on overlay (use original path order, not X-sorted)
+                                    # plot PG polyline on overlay (sort by X to avoid zigzag from merge order)
                                     if sr.profiles and sr.profiles.proposed_grade:
-                                        pg_pts = sr.profiles.proposed_grade.points
+                                        pg_pts = sorted(sr.profiles.proposed_grade.points, key=lambda p: p[0])
                                         if pg_pts:
                                             ox = [(p[0] - _page_x0) * _scale for p in pg_pts]
                                             oy = [(p[1] - _y_off) * _scale for p in pg_pts]
                                             ax_ov.plot(ox, oy, color="#00bbff", lw=2.5, ls="-",
                                                        label="Proposed Grade (extracted)", zorder=5, alpha=0.85)
+
 
                                     ax_ov.set_title(f"Overlay Verification — STA {sr.station_label}",
                                                     fontsize=13, fontweight="700")
@@ -599,7 +599,7 @@ else:
                             else:
                                 st.info("No region data or PDF path available for overlay.")
 
-                            # ── All candidates overlay ──
+                            # all candidates overlay
                             st.markdown("---")
                             st.markdown("**📊 All Scored Candidates (PDF Coordinate Space)**")
                             if sr.profiles and sr.profiles.scored_list:
@@ -654,7 +654,7 @@ else:
                                 st.pyplot(fig_ac)
                                 plt.close(fig_ac)
 
-                            # ── Raw polyline plot (legacy) ──
+                            # raw polyline plot
                             st.markdown("---")
                             st.markdown("**Raw Candidate Polylines (PDF Coordinate Space)**")
                             fig2, ax2 = plt.subplots(figsize=(12, 5))
@@ -694,7 +694,7 @@ else:
                                 st.dataframe(pd.DataFrame(sr.profiles.diagnostics["top_candidates"]),
                                              use_container_width=True, hide_index=True)
 
-                            # ── Original PDF Region Image for comparison ──
+                            # original PDF for comparison
                             st.markdown("---")
                             st.markdown("**📄 Original PDF Region (for visual comparison)**")
                             if sr.region and st.session_state.get("pdf_path"):
@@ -841,7 +841,7 @@ else:
                 st.markdown("---")
                 st.markdown("##### 🔍 Failure Diagnostics")
 
-                # ── Region info ──
+                # region info
                 if sr.region:
                     st.markdown(f"""
                     **Region Info:**
@@ -851,7 +851,7 @@ else:
                     * **Raw paths extracted:** `{sr.raw_paths_count}`
                     """)
 
-                # ── Profile identification diagnostics ──
+                # profile ID diagnostics
                 if sr.profiles and sr.profiles.diagnostics:
                     diag = sr.profiles.diagnostics
 
@@ -930,7 +930,7 @@ else:
                         st.pyplot(fig_dbg)
                         plt.close(fig_dbg)
 
-                    # ── Original PDF Region Image for comparison ──
+                    # original PDF for comparison
                     if sr.region and st.session_state.get("pdf_path"):
                         st.markdown("---")
                         st.markdown("##### 📄 Original PDF Region (for visual comparison)")
