@@ -1,0 +1,2 @@
+c:\Users\sudhe\Downloads\infra_llm-main\infra_llm-main\.env
+c:\Users\sudhe\Downloads\infra_llm-main\infra_llm-main\.gitignore
