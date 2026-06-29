@@ -21,6 +21,8 @@ Thumbs.db
 
 # Temp files from the Streamlit app
 xdot_*/
+output/
+reports/
 
 # Large PDF samples (optional — uncomment if you don't want PDFs in the repo)
 # *.pdf
