@@ -1,0 +1,607 @@
+ere is the complete approach and what needs to change:
+
+Problem
+The x-span sweep groups measurement bars (y≈163) together with the actual curve (y≈300-342) because they are x-close. The curve gets lost.
+Solution — X-span + Y-consistency grouping
+Rule for adding a component to a group
+A component joins the current group only if BOTH conditions are true:
+
+x_start <= current_x_max + 200 — x-gap tolerance
+abs(cy - group_median_cy) <= 50 — y must stay consistent with the group's median centre-y
+
+Where to change
+In _profiles_bw, inside the widest x-span sweep, replace the current group extension logic:
+python# Current (wrong) — only checks x gap
+if cx_start <= x_max + 200:
+    group.append(candidates[j])
+    x_max = max(x_max, cx_end)
+
+# New — checks BOTH x gap AND y consistency
+group_cys = [c[3] for c in group]  # collect all cy values in group
+group_median_cy = np.median(group_cys)
+
+if cx_start <= x_max + 200 and abs(candidates[j][3] - group_median_cy) <= 50:
+    group.append(candidates[j])
+    x_max = max(x_max, cx_end)
+Candidate tuple needs cy added
+Currently candidates store (i, x_start, x_end, y, w, h, area). Add cy = y + h//2 as index 3:
+pythoncandidates.append((i, x, x + w, y + h//2, w, h, area))
+Expected result
+
+Measurement bars at y=163 → group median stays at y=163 → span=539px
+Actual curve at y=300-342 → group median stays near y=320 → span=3250px
+Widest span wins → curve correctly identified
+
+Also update the EXISTING/REJECTED print and existing_mask lines
+Since tuple index changed, update all references from c[3] (was y) to use the new positions correctly.
+
+This single change to the grouping condition should fix the problem. The rest of the pipeline stays the same.
+
+
+
+"""
+area_calculator.py
+==================
+OpenCV-based cross-section area calculator.
+
+Supports TWO image types automatically:
+  - COLORED images (blue = existing ground, orange = proposed grade)
+  - B&W PDF renders (solid + dashed black lines on white/gray grid)
+
+B&W detection pipeline:
+  1. Detect grid scale FIRST on raw gray image (peak detection on grid cols)
+  2. Remove grid lines via morphological operations
+  3. Connected components — two-pass:
+       Pass 1: find widest Y-consistent x-span group → existing ground
+       Pass 2: dashed segments within existing ground bounds → proposed grade
+  4. Smooth both profiles with rolling median
+  5. Calculate area using grid scale from step 1
+
+Area formula:
+    total_px_area = Σ |y_line1[x] − y_line2[x]|  for all x where both lines exist
+    area_sqft     = total_px_area / px_per_sqft
+    px_per_sqft   = (grid_px²) / 100              (10ft × 10ft = 100 sqft)
+"""
+
+import cv2
+from scipy.signal import find_peaks
+import numpy as np
+
+# ─── HSV colour ranges (coloured images only) ────────────────────────────────
+_BLUE_LOWER   = np.array([100,  80,  50])
+_BLUE_UPPER   = np.array([130, 255, 255])
+_ORANGE_LOWER = np.array([  8, 100, 100])
+_ORANGE_UPPER = np.array([ 28, 255, 255])
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# CROP  –  remove empty white space below the drawing
+# ════════════════════════════════════════════════════════════════════════════
+
+def crop_to_drawing(img_bytes: bytes) -> bytes:
+    """
+    Removes large empty white space below the actual cross-section drawing.
+    Strategy: scan rows from the bottom upward; the first row that has
+    more than 30% dark pixels is the bottom edge of the drawing.
+    """
+    nparr = np.frombuffer(img_bytes, np.uint8)
+    img   = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    gray  = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    h, w  = img.shape[:2]
+
+    _, dark  = cv2.threshold(gray, 80, 255, cv2.THRESH_BINARY_INV)
+    row_dark = np.array([dark[y, :].sum() // 255 for y in range(h)])
+
+    bottom = h
+    for y in range(h - 1, 0, -1):
+        if row_dark[y] > w * 0.3:
+            bottom = y + 10
+            break
+
+    cropped = img[:bottom, :]
+    _, enc  = cv2.imencode('.png', cropped)
+    return enc.tobytes()
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# GRID DETECTION  –  peak detection on raw gray image BEFORE any processing
+# ════════════════════════════════════════════════════════════════════════════
+
+def _detect_grid_px(gray: np.ndarray) -> float:
+    """
+    Measures the pixel width of one grid square from the raw image.
+    Uses peak detection on column sums of medium-gray pixels (grid lines).
+    One grid square = 10ft × 10ft = 100 sq ft (engineering standard).
+    Falls back to border method only if peaks cannot be found.
+    """
+    grid_mask = cv2.inRange(gray, 155, 220)
+    col_sums  = grid_mask.sum(axis=0).astype(float)
+
+    print(f"GRID DEBUG: col_sums max={col_sums.max():.0f}")
+
+    if col_sums.max() > 0:
+        peaks, _ = find_peaks(col_sums,
+                               height=col_sums.max() * 0.3,
+                               distance=5)
+        print(f"GRID DEBUG: peaks found={len(peaks)}")
+        if len(peaks) >= 4:
+            spacings = np.diff(peaks).tolist()
+            minor    = [s for s in spacings if 10 < s < 100]
+            print(f"GRID DEBUG: minor spacings={sorted(minor)}")
+            if len(minor) >= 1:
+                result = float(np.median(minor))
+                print(f"GRID DEBUG: result={result}px")
+                return result
+
+    # Fallback — border method
+    print("GRID DEBUG: fell through to border fallback")
+    h, w = gray.shape
+    _, dark = cv2.threshold(gray, 80, 255, cv2.THRESH_BINARY_INV)
+    left_border = 0
+    for x in range(w):
+        if dark[:, x].sum() // 255 > h * 0.4:
+            left_border = x
+            break
+    right_border = w - 1
+    for x in range(w - 1, 0, -1):
+        if dark[:, x].sum() // 255 > h * 0.4:
+            right_border = x
+            break
+    return ((right_border - left_border) / 270.0) * 10.0
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# COLORED IMAGE
+# ════════════════════════════════════════════════════════════════════════════
+
+def _is_colored(hsv: np.ndarray) -> bool:
+    blue_px   = int(cv2.inRange(hsv, _BLUE_LOWER,   _BLUE_UPPER).sum())   // 255
+    orange_px = int(cv2.inRange(hsv, _ORANGE_LOWER, _ORANGE_UPPER).sum()) // 255
+    return blue_px > 50 and orange_px > 50
+
+
+def _profile_from_mask(mask: np.ndarray) -> dict:
+    profile = {}
+    for x in range(mask.shape[1]):
+        ys = np.where(mask[:, x] > 0)[0]
+        if len(ys):
+            profile[x] = float(ys.mean())
+    return profile
+
+
+def _profiles_colored(hsv: np.ndarray):
+    blue_mask   = cv2.inRange(hsv, _BLUE_LOWER,   _BLUE_UPPER)
+    orange_mask = cv2.inRange(hsv, _ORANGE_LOWER, _ORANGE_UPPER)
+    return _profile_from_mask(blue_mask), _profile_from_mask(orange_mask)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# PROFILE SMOOTHER
+# ════════════════════════════════════════════════════════════════════════════
+
+def _smooth_profile(profile: dict, window: int = 15) -> dict:
+    """
+    Rolling median to remove annotation noise from a profile.
+    Window of 15px smooths spikes from labels without distorting the curve.
+    """
+    if len(profile) < window:
+        return profile
+    xs   = sorted(profile.keys())
+    ys   = [profile[x] for x in xs]
+    half = window // 2
+    smoothed = {}
+    for i, x in enumerate(xs):
+        start = max(0, i - half)
+        end   = min(len(ys), i + half + 1)
+        smoothed[x] = float(np.median(ys[start:end]))
+    return smoothed
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# B&W IMAGE  –  Y-consistent widest x-span detection
+# ════════════════════════════════════════════════════════════════════════════
+
+def _profiles_bw(gray: np.ndarray):
+    """
+    Two-pass connected components with Y-consistency grouping:
+
+    Pass 1 — existing ground (widest Y-consistent x-span):
+      - Collect ALL solid candidates (low size threshold to catch thin curve segments)
+      - Sweep sorted candidates, group by x-proximity (gap <= 200px) AND
+        y-proximity (centre-y within 50px of group median)
+      - The group with the widest total x-span = existing ground curve
+
+    Pass 2 — proposed grade (dashed segments within existing ground bounds)
+
+    Both profiles smoothed with rolling median.
+    """
+    h_img, w_img = gray.shape
+
+    # ── Step 1: threshold ────────────────────────────────────────────────────
+    _, bw = cv2.threshold(gray, 235, 255, cv2.THRESH_BINARY_INV)
+
+    # ── Step 2: grid removal ─────────────────────────────────────────────────
+    ver_k = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 200))
+    hor_k = cv2.getStructuringElement(cv2.MORPH_RECT, (200, 1))
+    grid_mask = cv2.add(
+        cv2.morphologyEx(bw, cv2.MORPH_OPEN, ver_k),
+        cv2.morphologyEx(bw, cv2.MORPH_OPEN, hor_k)
+    )
+    diagram_only  = cv2.subtract(bw, grid_mask)
+    bridge_shield = cv2.dilate(diagram_only, np.ones((3, 3), np.uint8), iterations=1)
+    eraser        = cv2.subtract(grid_mask, bridge_shield)
+    clean_bw      = cv2.subtract(bw, eraser)
+
+    # ── Step 3: connected components ─────────────────────────────────────────
+    nlabels, labels, stats, _ = cv2.connectedComponentsWithStats(
+        clean_bw, 8, cv2.CV_32S
+    )
+
+    border_w = int(w_img * 0.08)
+    border_h = int(h_img * 0.08)
+
+    # ── Collect candidates — LOW size threshold to catch thin curve segments ──
+    # tuple: (label_id, x_start, x_end, cy, w, h, area)
+    candidates = []
+    for i in range(1, nlabels):
+        x, y, w, h, area = stats[i]
+
+        # Border protection
+        if (x < border_w or (x + w) > (w_img - border_w) or
+                y < border_h or (y + h) > (h_img - border_h)):
+            continue
+
+        diag_len   = np.sqrt(w ** 2 + h ** 2)
+        bbox_area  = w * h
+        fill_ratio = area / bbox_area if bbox_area > 0 else 0
+        cy         = y + h // 2
+
+        # Skip arrows (tall and narrow)
+        if h >= 16 and w <= 45:
+            continue
+
+        # Skip hollow outlines (pavement box etc)
+        if fill_ratio < 0.15:
+            continue
+
+        # Skip dimension lines (< 3px average thickness)
+        if area < w * 3:
+            continue
+
+        # LOW size threshold — catches small curve dashes (w=12, h=5)
+        # as well as larger solid segments
+        if diag_len > 10 or w > 8 or h > 4:
+            candidates.append((i, x, x + w, cy, w, h, area))
+
+    print(f"PASS1 DEBUG: total candidates={len(candidates)}")
+
+    # ── Find widest Y-consistent x-span group ─────────────────────────────────
+    existing_mask = np.zeros((h_img, w_img), dtype=np.uint8)
+
+    if candidates:
+        candidates.sort(key=lambda c: c[1])   # sort by x_start
+
+        best_span  = 0
+        best_group = []
+
+        for start_idx in range(len(candidates)):
+            group = [candidates[start_idx]]
+            x_max = candidates[start_idx][2]
+
+            for j in range(start_idx + 1, len(candidates)):
+                cx_start = candidates[j][1]
+                cx_end   = candidates[j][2]
+                cy_j     = candidates[j][3]
+
+                # X-gap check — stop if too far right
+                if cx_start > x_max + 200:
+                    break
+
+                # Y-consistency check — only join group if y is close
+                group_median_cy = float(np.median([c[3] for c in group]))
+                if abs(cy_j - group_median_cy) <= 50:
+                    group.append(candidates[j])
+                    x_max = max(x_max, cx_end)
+
+            x_min = candidates[start_idx][1]
+            span  = x_max - x_min
+            if span > best_span:
+                best_span  = span
+                best_group = group
+
+        print(f"WIDEST X-SPAN: {candidates[0][1] if best_group else '?'} "
+              f"span={best_span}px  components={len(best_group)}")
+
+        # Print accepted and rejected components
+        best_ids = {c[0] for c in best_group}
+        for c in candidates:
+            i_c, xs, xe, cy_c, wc, hc, ac = c
+            if i_c in best_ids:
+                print(f"  EXISTING: x={xs} y={cy_c} w={wc} h={hc} area={ac}")
+            # Uncomment below to see rejected too (verbose)
+            # else:
+            #     print(f"  REJECTED: x={xs} y={cy_c} w={wc} h={hc}")
+
+        for i in range(1, nlabels):
+            if i in best_ids:
+                existing_mask[labels == i] = 255
+
+    # ── Derive search bounds from existing ground ─────────────────────────────
+    existing_cols = np.where(existing_mask.sum(axis=0) > 0)[0]
+    existing_rows = np.where(existing_mask.sum(axis=1) > 0)[0]
+
+    if len(existing_cols) > 0 and len(existing_rows) > 0:
+        ex_x_min = max(0,     int(existing_cols[0])  - int(w_img * 0.03))
+        ex_x_max = min(w_img, int(existing_cols[-1]) + int(w_img * 0.03))
+        ex_y_min = max(0,     int(existing_rows[0])  - int(h_img * 0.15))
+        ex_y_max = min(h_img, int(existing_rows[-1]) + int(h_img * 0.15))
+    else:
+        ex_x_min, ex_x_max = border_w, w_img - border_w
+        ex_y_min, ex_y_max = border_h, h_img - border_h
+
+    print(f"SEARCH BOUNDS: x={ex_x_min}–{ex_x_max}  y={ex_y_min}–{ex_y_max}")
+
+    # ── Pass 2: proposed grade (dashed segments) within bounds ───────────────
+    proposed_mask = np.zeros((h_img, w_img), dtype=np.uint8)
+    for i in range(1, nlabels):
+        x, y, w, h, area = stats[i]
+        cx = x + w // 2
+        cy = y + h // 2
+        if not (ex_x_min <= cx <= ex_x_max and ex_y_min <= cy <= ex_y_max):
+            continue
+        ar = w / h if h > 0 else 0
+        if h >= 16 and w <= 45:
+            continue
+        if 3 <= w <= 45 and 2 <= h <= 12 and ar > 1.0:
+            proposed_mask[labels == i] = 255
+
+    # ── Build raw profiles ────────────────────────────────────────────────────
+    profile_a_raw = _profile_from_mask(existing_mask)
+    profile_b_raw = _profile_from_mask(proposed_mask)
+
+    # Filter outliers — remove y-values far from each profile's median
+    if profile_a_raw:
+        med_a = float(np.median(list(profile_a_raw.values())))
+        profile_a_raw = {x: y for x, y in profile_a_raw.items()
+                         if abs(y - med_a) < 40}
+
+    if profile_b_raw:
+        med_b = float(np.median(list(profile_b_raw.values())))
+        profile_b_raw = {x: y for x, y in profile_b_raw.items()
+                         if abs(y - med_b) < 40}
+
+    # Smooth both profiles
+    profile_a = _smooth_profile(profile_a_raw, window=15)
+    profile_b = _smooth_profile(profile_b_raw, window=15)
+
+    # ── Temporary y-value debug ───────────────────────────────────────────────
+    if profile_a:
+        xs_sample = sorted(profile_a.keys())[::100]
+        print("profile_a sample y:", [(x, round(profile_a[x], 1)) for x in xs_sample])
+    if profile_b:
+        xs_sample = sorted(profile_b.keys())[::100]
+        print("profile_b sample y:", [(x, round(profile_b[x], 1)) for x in xs_sample])
+
+    # ── Debug prints ──────────────────────────────────────────────────────────
+    existing_col_arr = np.where(existing_mask.sum(axis=0) > 0)[0]
+    proposed_col_arr = np.where(proposed_mask.sum(axis=0) > 0)[0]
+    if len(existing_col_arr) > 0:
+        print(f"existing x: {existing_col_arr[0]} to {existing_col_arr[-1]}")
+    if len(proposed_col_arr) > 0:
+        print(f"proposed x: {proposed_col_arr[0]} to {proposed_col_arr[-1]}")
+    print(f"BW DEBUG: existing cols={len(profile_a)}  proposed cols={len(profile_b)}")
+
+    return profile_a, profile_b
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# REGION DETECTION
+# ════════════════════════════════════════════════════════════════════════════
+
+def _find_regions(profile_a: dict, profile_b: dict) -> list:
+    common_x = sorted(set(profile_a.keys()) & set(profile_b.keys()))
+    if not common_x:
+        return []
+
+    regions = []
+    current = None
+
+    for x in common_x:
+        ay    = profile_a[x]
+        by    = profile_b[x]
+        gap   = abs(ay - by)
+        rtype = "FILL" if ay < by else "CUT"
+
+        if current is None:
+            current = {"type": rtype, "start_x": x, "end_x": x,
+                       "pixel_area": gap, "col_count": 1}
+        elif rtype == current["type"]:
+            current["end_x"]       = x
+            current["pixel_area"] += gap
+            current["col_count"]  += 1
+        else:
+            regions.append(current)
+            current = {"type": rtype, "start_x": x, "end_x": x,
+                       "pixel_area": gap, "col_count": 1}
+
+    if current:
+        regions.append(current)
+
+    # Merge tiny transition slivers (< 5 columns) into the previous region
+    merged = []
+    for r in regions:
+        if r["col_count"] < 5 and merged:
+            merged[-1]["pixel_area"] += r["pixel_area"]
+            merged[-1]["end_x"]       = r["end_x"]
+            merged[-1]["col_count"]  += r["col_count"]
+        else:
+            merged.append(r)
+
+    return merged
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# PUBLIC API
+# ════════════════════════════════════════════════════════════════════════════
+
+def calculate_area(img_bytes: bytes) -> dict:
+    print("CALCULATE_AREA CALLED")
+    try:
+        nparr = np.frombuffer(img_bytes, np.uint8)
+        img   = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if img is None:
+            return {"error": "Could not decode image"}
+
+        import inspect
+        print("FILE:", inspect.getfile(calculate_area))
+
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        hsv  = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+        # ── Step 1: grid scale FIRST on raw gray ──────────────────────────────
+        grid_px     = _detect_grid_px(gray)
+        px_per_sqft = (grid_px ** 2) / 100.0
+
+        # ── Step 2: line detection ────────────────────────────────────────────
+        if _is_colored(hsv):
+            profile_a, profile_b = _profiles_colored(hsv)
+            image_type = "colored"
+        else:
+            profile_a, profile_b = _profiles_bw(gray)
+            image_type = "bw"
+
+        if not profile_a or not profile_b:
+            return {
+                "error": (
+                    f"Could not detect both lines (image_type={image_type}). "
+                    "Ensure cross-section curves are clearly visible."
+                )
+            }
+
+        # ── Step 3: find regions and calculate area ───────────────────────────
+        raw_regions = _find_regions(profile_a, profile_b)
+
+        regions_out = []
+        for r in raw_regions:
+            area_sqft = r["pixel_area"] / px_per_sqft
+            regions_out.append({
+                "type":       r["type"],
+                "start_x_px": r["start_x"],
+                "end_x_px":   r["end_x"],
+                "width_px":   r["end_x"] - r["start_x"],
+                "area_sqft":  round(area_sqft, 2)
+            })
+
+        total_cut  = sum(r["area_sqft"] for r in regions_out if r["type"] == "CUT")
+        total_fill = sum(r["area_sqft"] for r in regions_out if r["type"] == "FILL")
+
+        # ── Debug: profile ranges ─────────────────────────────────────────────
+        common = set(profile_a.keys()) & set(profile_b.keys())
+        if profile_a:
+            print(f"profile_a x range: {min(profile_a.keys())} to {max(profile_a.keys())}, cols={len(profile_a)}")
+        if profile_b:
+            print(f"profile_b x range: {min(profile_b.keys())} to {max(profile_b.keys())}, cols={len(profile_b)}")
+        if common:
+            print(f"common x range: {min(common)} to {max(common)}, cols={len(common)}")
+        print(f"px_per_sqft={px_per_sqft:.4f}  total_cut={total_cut}  total_fill={total_fill}")
+
+        return {
+            "image_type":      image_type,
+            "grid_px":         round(grid_px, 2),
+            "px_per_sqft":     round(px_per_sqft, 4),
+            "regions":         regions_out,
+            "total_cut_sqft":  round(total_cut,  2),
+            "total_fill_sqft": round(total_fill, 2),
+            "net_sqft":        round(total_cut - total_fill, 2),
+            "error":           None
+        }
+
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# DEBUG VISUALIZATION
+# ════════════════════════════════════════════════════════════════════════════
+
+def generate_debug_image(img_bytes: bytes) -> bytes:
+    nparr = np.frombuffer(img_bytes, np.uint8)
+    img   = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    gray  = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    hsv   = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    h, w  = img.shape[:2]
+
+    vis = img.copy()
+
+    # ── Grid lines overlay ────────────────────────────────────────────────────
+    grid_mask = cv2.inRange(gray, 175, 225)
+    col_sums  = grid_mask.sum(axis=0).astype(float)
+    row_sums  = grid_mask.sum(axis=1).astype(float)
+
+    v_peaks, _ = find_peaks(col_sums, height=col_sums.max() * 0.5, distance=8)
+    h_peaks, _ = find_peaks(row_sums, height=row_sums.max() * 0.5, distance=8)
+
+    for x in v_peaks:
+        cv2.line(vis, (int(x), 0), (int(x), h), (0, 200, 0), 1)
+    for y in h_peaks:
+        cv2.line(vis, (0, int(y)), (w, int(y)), (200, 0, 0), 1)
+
+    # ── Highlighted grid square ───────────────────────────────────────────────
+    grid_px = _detect_grid_px(gray)
+    if len(h_peaks) >= 2 and len(v_peaks) >= 1:
+        x1 = int(v_peaks[0])
+        x2 = x1 + int(grid_px)
+        y1, y2 = int(h_peaks[0]), int(h_peaks[1])
+        cv2.rectangle(vis, (x1, y1), (x2, y2), (0, 255, 255), 2)
+        cv2.putText(vis, f"{int(grid_px)}x{int(grid_px)}px = 100 sqft",
+                    (x1 + 2, y1 + (y2 - y1) // 2),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 255), 1)
+
+    # ── Line profiles ─────────────────────────────────────────────────────────
+    if _is_colored(hsv):
+        profile_a, profile_b = _profiles_colored(hsv)
+    else:
+        profile_a, profile_b = _profiles_bw(gray)
+
+    for x, y in profile_a.items():
+        iy = int(round(y))
+        if 0 <= iy < h:
+            cv2.circle(vis, (x, iy), 1, (0, 0, 255), -1)      # red = existing ground
+
+    for x, y in profile_b.items():
+        iy = int(round(y))
+        if 0 <= iy < h:
+            cv2.circle(vis, (x, iy), 1, (0, 165, 255), -1)    # orange = proposed grade
+
+    # ── Enclosed area — CUT=red fill, FILL=blue fill ──────────────────────────
+    overlay  = vis.copy()
+    common_x = sorted(set(profile_a.keys()) & set(profile_b.keys()))
+    for x in common_x:
+        ya    = int(round(profile_a[x]))
+        yb    = int(round(profile_b[x]))
+        y_top = min(ya, yb)
+        y_bot = max(ya, yb)
+        if 0 <= y_top < h and 0 <= y_bot < h:
+            if ya > yb:
+                cv2.line(overlay, (x, y_top), (x, y_bot), (0, 0, 220), 1)    # red = CUT
+            else:
+                cv2.line(overlay, (x, y_top), (x, y_bot), (220, 100, 0), 1)  # blue = FILL
+
+    cv2.addWeighted(overlay, 0.6, vis, 0.4, 0, vis)
+
+    # ── Legend ────────────────────────────────────────────────────────────────
+    legend_y = 12
+    for color, text in [
+        ((0, 200, 0),   "Green      = grid lines"),
+        ((0, 0, 255),   "Red dots   = existing ground"),
+        ((0, 165, 255), "Orange dots= proposed grade"),
+        ((0, 0, 220),   "Red fill   = CUT region"),
+        ((220, 100, 0), "Blue fill  = FILL region"),
+        ((0, 255, 255), "Yellow box = 1 grid square = 100 sqft"),
+    ]:
+        cv2.putText(vis, text, (5, legend_y),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.32, color, 1)
+        legend_y += 12
+
+    _, enc = cv2.imencode('.png', vis)
+    return enc.tobytes()
