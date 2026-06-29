@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+venv/
+.env
+
+# Output folders
+output/
+
+# PDF files (if they are test files)
+*.pdf
+
+# OS files
+.DS_Store
+Thumbs.db
