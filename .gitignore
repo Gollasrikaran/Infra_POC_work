@@ -23,6 +23,7 @@ Thumbs.db
 xdot_*/
 output/
 reports/
+output_debug/
 
 # Large PDF samples (optional — uncomment if you don't want PDFs in the repo)
 # *.pdf
